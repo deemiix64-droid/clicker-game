@@ -23,7 +23,7 @@ let gameState = {
     autoClicker: {
         enabled: false,
         timeLeft: 0,
-        maxTime: 120, // 2 минуты
+        maxTime: 120,
         level: 1
     },
     turbo: {
@@ -32,48 +32,81 @@ let gameState = {
         maxTime: 30,
         multiplier: 2
     },
-    version: '5.1'
+    version: '5.6'
 };
 
-// ========== ТАБЛИЦА ЛИДЕРОВ (ТОЛЬКО РЕАЛЬНЫЕ ИГРОКИ) ==========
+// ========== ТАБЛИЦА ЛИДЕРОВ - ТОЛЬКО РЕАЛЬНЫЕ ИГРОКИ ==========
 let leaderboardDB = [];
 
-// Загрузка лидеров
+// Загрузка лидеров (полная очистка от ботов)
 function loadLeaderboard() {
     const saved = localStorage.getItem('leaderboard_db');
     if (saved) {
         try {
             leaderboardDB = JSON.parse(saved);
-            // Фильтруем ТОЛЬКО реальных игроков (с валидными никами)
-            leaderboardDB = leaderboardDB.filter(player => 
-                player.name && 
-                player.name.length >= 3 && 
-                player.name !== 'Бот' && 
-                player.name !== 'Тест' &&
-                player.name !== 'Игрок' &&
-                !player.name.includes('бот') &&
-                !player.name.includes('test')
-            );
             
-            // Удаляем дубликаты по нику
-            const uniqueNames = new Set();
+            // ЖЕСТКАЯ ФИЛЬТРАЦИЯ - только реальные игроки
             leaderboardDB = leaderboardDB.filter(player => {
-                if (uniqueNames.has(player.name)) return false;
-                uniqueNames.add(player.name);
+                // Проверяем что имя существует
+                if (!player || !player.name) return false;
+                
+                const name = player.name.toLowerCase().trim();
+                
+                // Удаляем все тестовые имена
+                const bannedNames = [
+                    'бот', 'bot', 'test', 'тест', 'demo', 'демо',
+                    'player', 'игрок', 'user', 'пользователь',
+                    'admin', 'админ', 'moder', 'модер',
+                    'guest', 'гость', 'unknown', 'неизвестный',
+                    'bot1', 'bot2', 'test1', 'test2',
+                    'bot123', 'test123', 'demo123'
+                ];
+                
+                // Проверяем на запрещенные слова
+                for (let banned of bannedNames) {
+                    if (name.includes(banned)) return false;
+                }
+                
+                // Проверяем длину (минимум 3 символа)
+                if (name.length < 3) return false;
+                
+                // Проверяем что это не числовой ник
+                if (/^\d+$/.test(name)) return false;
+                
+                // Проверяем что счет не NaN и не отрицательный
+                if (isNaN(player.score) || player.score < 0) return false;
+                
                 return true;
             });
             
+            // Удаляем дубликаты (оставляем только последнюю запись для каждого игрока)
+            const uniquePlayers = new Map();
+            leaderboardDB.forEach(player => {
+                // Для каждого игрока оставляем запись с самым высоким счетом
+                const existing = uniquePlayers.get(player.name);
+                if (!existing || player.score > existing.score) {
+                    uniquePlayers.set(player.name, player);
+                }
+            });
+            
+            leaderboardDB = Array.from(uniquePlayers.values());
+            
         } catch (e) {
+            console.error('Ошибка загрузки лидеров:', e);
             leaderboardDB = [];
         }
     } else {
+        // Никаких демо-данных - чистый список
         leaderboardDB = [];
     }
     
     // Сортируем по убыванию
     leaderboardDB.sort((a, b) => (b.score || 0) - (a.score || 0));
+    
     // Оставляем только топ-20
-    if (leaderboardDB.length > 20) leaderboardDB = leaderboardDB.slice(0, 20);
+    if (leaderboardDB.length > 20) {
+        leaderboardDB = leaderboardDB.slice(0, 20);
+    }
     
     saveLeaderboard();
     renderLeaderboard();
@@ -82,35 +115,56 @@ function loadLeaderboard() {
 // Сохранение лидеров
 function saveLeaderboard() {
     try {
-        // Добавляем текущего игрока только если он реален
+        // Добавляем текущего игрока только если он реальный
         if (gameState.nickname && gameState.nickname.length >= 3) {
-            const playerScore = isNaN(gameState.balance) ? 0 : Math.floor(gameState.balance);
             
-            // Удаляем все записи с таким ником (чтобы не было дубликатов)
-            leaderboardDB = leaderboardDB.filter(p => p.name !== gameState.nickname);
+            // Проверяем что ник не запрещен
+            const name = gameState.nickname.toLowerCase();
+            const bannedNames = ['бот', 'bot', 'test', 'тест', 'demo', 'демо', 'admin'];
+            let isReal = true;
             
-            // Добавляем актуальную запись
-            leaderboardDB.push({
-                name: gameState.nickname,
-                score: playerScore,
-                lastUpdate: Date.now()
-            });
-            
-            // Финальная фильтрация
-            leaderboardDB = leaderboardDB.filter(p => 
-                p.name && 
-                p.name.length >= 3 && 
-                !isNaN(p.score) && 
-                p.score >= 0
-            );
-            
-            // Сортируем
-            leaderboardDB.sort((a, b) => (b.score || 0) - (a.score || 0));
-            
-            // Оставляем топ-20
-            if (leaderboardDB.length > 20) {
-                leaderboardDB = leaderboardDB.slice(0, 20);
+            for (let banned of bannedNames) {
+                if (name.includes(banned)) {
+                    isReal = false;
+                    break;
+                }
             }
+            
+            if (isReal) {
+                const playerScore = isNaN(gameState.balance) ? 0 : Math.floor(gameState.balance);
+                
+                // Удаляем старую запись этого игрока
+                leaderboardDB = leaderboardDB.filter(p => p.name !== gameState.nickname);
+                
+                // Добавляем новую запись
+                leaderboardDB.push({
+                    name: gameState.nickname,
+                    score: playerScore,
+                    lastUpdate: Date.now()
+                });
+            }
+        }
+        
+        // ФИНАЛЬНАЯ ФИЛЬТРАЦИЯ перед сохранением
+        leaderboardDB = leaderboardDB.filter(p => {
+            if (!p || !p.name) return false;
+            
+            const name = p.name.toLowerCase();
+            const bannedNames = ['бот', 'bot', 'test', 'тест', 'demo', 'демо'];
+            
+            for (let banned of bannedNames) {
+                if (name.includes(banned)) return false;
+            }
+            
+            return p.name.length >= 3 && !isNaN(p.score) && p.score >= 0;
+        });
+        
+        // Сортируем
+        leaderboardDB.sort((a, b) => (b.score || 0) - (a.score || 0));
+        
+        // Топ-20
+        if (leaderboardDB.length > 20) {
+            leaderboardDB = leaderboardDB.slice(0, 20);
         }
         
         localStorage.setItem('leaderboard_db', JSON.stringify(leaderboardDB));
@@ -128,10 +182,10 @@ function renderLeaderboard() {
     if (!leaderboardDB || leaderboardDB.length === 0) {
         board.innerHTML = `
             <div class="leader-row">
-                <span class="leader-name">Пока нет игроков</span>
+                <span class="leader-name" style="text-align: center; width: 100%;">👥 Пока нет игроков</span>
             </div>
             <div class="leader-row">
-                <span class="leader-name">Войдите и станьте первым!</span>
+                <span class="leader-name" style="text-align: center; width: 100%;">Будьте первым!</span>
             </div>
         `;
         return;
@@ -139,10 +193,15 @@ function renderLeaderboard() {
     
     board.innerHTML = leaderboardDB.map((player, index) => {
         const score = !isNaN(player.score) && player.score >= 0 ? player.score : 0;
+        let rankClass = '';
+        
+        if (index === 0) rankClass = 'gold';
+        else if (index === 1) rankClass = 'silver';
+        else if (index === 2) rankClass = 'bronze';
         
         return `
             <div class="leader-row">
-                <span class="rank ${index < 3 ? 'top' : ''}">${index + 1}</span>
+                <span class="leader-rank ${rankClass}">${index + 1}</span>
                 <span class="leader-name">${player.name || 'Игрок'}</span>
                 <span class="leader-score">💰 ${formatNumber(score)}</span>
             </div>
@@ -237,6 +296,8 @@ function loadClickFile() {
                 updateTurboUI();
                 renderShop();
                 renderSkins();
+                renderCases();
+                renderPromoList();
                 saveLeaderboard();
                 
                 showNotif('✅ Успешно', 'Игра загружена');
@@ -254,7 +315,7 @@ function loadClickFile() {
     input.click();
 }
 
-// ========== ЗВУКИ ==========
+// ========== ЗВУКИ (УБРАЛ ЗВУК КЛИКА) ==========
 function playSound(type) {
     if (!gameState.settings.sounds) return;
     
@@ -267,12 +328,6 @@ function playSound(type) {
         gainNode.connect(audioContext.destination);
         
         switch(type) {
-            case 'click':
-                oscillator.frequency.value = 800;
-                gainNode.gain.value = 0.1;
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + 0.1);
-                break;
             case 'turbo':
                 oscillator.frequency.value = 1200;
                 gainNode.gain.value = 0.2;
@@ -291,6 +346,7 @@ function playSound(type) {
                 oscillator.start();
                 oscillator.stop(audioContext.currentTime + 0.4);
                 break;
+            // Звук клика УДАЛЕН - теперь тишина при клике
         }
     } catch (e) {
         // Игнорируем ошибки звука
@@ -335,10 +391,12 @@ function updateTurboUI() {
     const turboIndicator = document.getElementById('turboIndicator');
     const clicker = document.getElementById('clickBtn');
     
+    if (!turboSection || !turboStatus || !turboTimer || !turboProgress) return;
+    
     if (gameState.turbo.active && gameState.turbo.timeLeft > 0) {
         turboStatus.innerHTML = `
             <span class="turbo-icon">⚡</span>
-            <span class="turbo-text">Турбо режим АКТИВЕН (x2)</span>
+            <span>Турбо АКТИВЕН (x2)</span>
         `;
         
         const seconds = gameState.turbo.timeLeft;
@@ -347,24 +405,27 @@ function updateTurboUI() {
         const progress = (seconds / gameState.turbo.maxTime) * 100;
         turboProgress.style.width = progress + '%';
         
-        turboIndicator.style.display = 'block';
-        clicker.classList.add('turbo-active');
+        if (turboIndicator) turboIndicator.style.display = 'block';
+        if (clicker) clicker.classList.add('turbo-active');
     } else {
         turboStatus.innerHTML = `
             <span class="turbo-icon">⚡</span>
-            <span class="turbo-text">Турбо режим выключен</span>
+            <span>Турбо выключен</span>
         `;
         turboTimer.textContent = '0:00';
         turboProgress.style.width = '0%';
-        turboIndicator.style.display = 'none';
-        clicker.classList.remove('turbo-active');
+        
+        if (turboIndicator) turboIndicator.style.display = 'none';
+        if (clicker) clicker.classList.remove('turbo-active');
     }
 }
 
 // ========== ЗАПУСК ==========
 document.addEventListener('DOMContentLoaded', () => {
+    // Загружаем лидеров (уже без ботов)
     loadLeaderboard();
     
+    // Загружаем сохранение
     if (loadGame() && gameState.nickname && gameState.nickname.length >= 3) {
         document.getElementById('playerName').textContent = gameState.nickname;
         document.getElementById('profileName').textContent = gameState.nickname;
@@ -402,17 +463,10 @@ function initEvents() {
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
         
-        // При входе чистим лидеров от ботов
-        leaderboardDB = leaderboardDB.filter(p => 
-            p.name && 
-            p.name.length >= 3 && 
-            p.name !== 'Бот' && 
-            p.name !== 'Тест' &&
-            !p.name.includes('бот')
-        );
-        
-        saveGame();
+        // При входе полностью очищаем лидеров от ботов
+        leaderboardDB = [];
         saveLeaderboard();
+        
         showNotif('✅ Добро пожаловать!', `Привет, ${name}!`);
     });
     
@@ -480,7 +534,8 @@ function initEvents() {
         btn.style.transform = 'scale(0.9)';
         setTimeout(() => btn.style.transform = '', 100);
         
-        playSound('click');
+        // ЗВУК КЛИКА УДАЛЕН - теперь тишина
+        
         updateUI();
     });
     
@@ -624,16 +679,13 @@ function initEvents() {
         }
         
         if (gameState.autoClicker.enabled) {
-            // Останавливаем
             gameState.autoClicker.enabled = false;
-            gameState.autoClicker.timeLeft = 0;
             showNotif('⏸️ Автокликер остановлен', '', 'info');
         } else {
-            // Запускаем на maxTime секунд
             gameState.autoClicker.enabled = true;
             gameState.autoClicker.timeLeft = gameState.autoClicker.maxTime;
             playSound('upgrade');
-            showNotif('▶️ Автокликер запущен', `Будет работать ${gameState.autoClicker.maxTime} секунд`, 'success');
+            showNotif('▶️ Автокликер запущен', `Будет работать ${gameState.autoClicker.maxTime} сек`, 'success');
         }
         
         updateAutoMenu();
@@ -677,9 +729,11 @@ function updateAutoMenu() {
     document.getElementById('upgradePrice').textContent = `${100 * level}💰`;
     
     const startBtn = document.getElementById('autoMenuStart');
-    startBtn.innerHTML = gameState.autoClicker.enabled ? 
-        '<span>⏹️</span><span>Остановить</span>' : 
-        '<span>▶️</span><span>Запустить</span>';
+    if (startBtn) {
+        startBtn.innerHTML = gameState.autoClicker.enabled ? 
+            '<span>⏹️</span><span>Остановить</span>' : 
+            '<span>▶️</span><span>Запустить</span>';
+    }
     
     if (gameState.autoClicker.enabled) {
         const timeLeft = isNaN(gameState.autoClicker.timeLeft) ? 0 : gameState.autoClicker.timeLeft;
@@ -689,7 +743,7 @@ function updateAutoMenu() {
         
         const maxTime = isNaN(gameState.autoClicker.maxTime) ? 120 : gameState.autoClicker.maxTime;
         const progress = maxTime > 0 ? ((maxTime - timeLeft) / maxTime) * 100 : 0;
-        document.getElementById('autoMenuProgress').style.width = progress + '%';
+        document.getElementById('autoMenuProgress').style.width = Math.min(100, Math.max(0, progress)) + '%';
     } else {
         const maxTime = isNaN(gameState.autoClicker.maxTime) ? 120 : gameState.autoClicker.maxTime;
         const minutes = Math.floor(maxTime / 60);
@@ -712,7 +766,7 @@ function showNotif(title, msg, type = 'success') {
     box.appendChild(n);
     
     setTimeout(() => {
-        n.style.animation = 'slide 0.3s reverse';
+        n.style.animation = 'notificationSlide 0.3s reverse';
         setTimeout(() => n.remove(), 300);
     }, 3000);
     
@@ -727,23 +781,26 @@ function renderShop() {
     if (!grid) return;
     
     grid.innerHTML = `
-        <div class="shop-item">
-            <span>🤖</span>
-            <span>Автокликер</span>
-            <span>+1/сек</span>
-            <button onclick="buyItem('auto')">50💰</button>
+        <div class="shop-card">
+            <span class="card-icon">🤖</span>
+            <span class="card-title">Автокликер</span>
+            <span class="card-desc">+1/сек</span>
+            <span class="card-price">50💰</span>
+            <button class="card-btn" onclick="buyItem('auto')">Купить</button>
         </div>
-        <div class="shop-item">
-            <span>💪</span>
-            <span>Сила</span>
-            <span>+1 к силе</span>
-            <button onclick="buyItem('power')">100💰</button>
+        <div class="shop-card">
+            <span class="card-icon">💪</span>
+            <span class="card-title">Сила</span>
+            <span class="card-desc">+1 к силе</span>
+            <span class="card-price">100💰</span>
+            <button class="card-btn" onclick="buyItem('power')">Купить</button>
         </div>
-        <div class="shop-item">
-            <span>⚡</span>
-            <span>Турбо</span>
-            <span>x2 на 30 сек</span>
-            <button onclick="buyItem('turbo')">50💰</button>
+        <div class="shop-card">
+            <span class="card-icon">⚡</span>
+            <span class="card-title">Турбо</span>
+            <span class="card-desc">x2 на 30 сек</span>
+            <span class="card-price">50💰</span>
+            <button class="card-btn" onclick="buyItem('turbo')">Купить</button>
         </div>
     `;
 }
@@ -790,19 +847,23 @@ function renderSkins() {
     grid.innerHTML = skins.map(s => {
         const owned = gameState.ownedSkins.includes(s.id);
         return `
-            <div class="skin-item" data-skin="${s.id}" data-price="${s.price}">
+            <div class="skin-card" data-skin="${s.id}" data-price="${s.price}">
                 <div class="skin-preview skin-${s.id}"></div>
                 <div class="skin-name">${s.name}</div>
-                <div class="skin-price">${owned ? '✓ Есть' : s.price + '💰'}</div>
-                <button ${owned ? 'disabled' : ''}>${owned ? 'В коллекции' : 'Купить'}</button>
+                <div class="skin-price">${owned ? '✓ Владеете' : s.price + '💰'}</div>
+                <button class="skin-btn" ${owned ? 'disabled' : ''}>
+                    ${owned ? 'В коллекции' : 'Купить'}
+                </button>
             </div>
         `;
     }).join('');
     
-    document.querySelectorAll('.skin-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const id = item.dataset.skin;
-            const price = parseInt(item.dataset.price);
+    document.querySelectorAll('.skin-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') return;
+            
+            const id = card.dataset.skin;
+            const price = parseInt(card.dataset.price);
             const balance = isNaN(gameState.balance) ? 0 : gameState.balance;
             
             if (gameState.ownedSkins.includes(id)) {
@@ -837,19 +898,19 @@ function renderCases() {
             <div class="case-icon">📦</div>
             <div class="case-name">Обычный</div>
             <div class="case-price">100💰</div>
-            <button onclick="openCase('normal')">Открыть</button>
+            <button class="case-btn" onclick="openCase('normal')">Открыть</button>
         </div>
         <div class="case-card rare">
             <div class="case-icon">💎</div>
             <div class="case-name">Редкий</div>
             <div class="case-price">500💰</div>
-            <button onclick="openCase('rare')">Открыть</button>
+            <button class="case-btn" onclick="openCase('rare')">Открыть</button>
         </div>
         <div class="case-card epic">
             <div class="case-icon">👑</div>
             <div class="case-name">Эпический</div>
             <div class="case-price">1000💰</div>
-            <button onclick="openCase('epic')">Открыть</button>
+            <button class="case-btn" onclick="openCase('epic')">Открыть</button>
         </div>
     `;
 }
@@ -886,7 +947,7 @@ window.openCase = (type) => {
         return;
     }
     
-    showCaseAnim(type, () => {
+    showCaseAnimation(type, () => {
         gameState.balance = balance - price;
         gameState.casesOpened = (isNaN(gameState.casesOpened) ? 0 : gameState.casesOpened) + 1;
         gameState.balance = (isNaN(gameState.balance) ? 0 : gameState.balance) + reward;
@@ -905,11 +966,13 @@ window.openCase = (type) => {
     });
 };
 
-function showCaseAnim(type, cb) {
+function showCaseAnimation(type, callback) {
     const anim = document.getElementById('caseAnimation');
     const box = document.getElementById('caseBox');
     const text = document.getElementById('caseText');
     const result = document.getElementById('caseResult');
+    
+    if (!anim || !box || !text || !result) return;
     
     box.className = 'case-box';
     box.textContent = type === 'normal' ? '📦' : type === 'rare' ? '💎' : '👑';
@@ -923,7 +986,7 @@ function showCaseAnim(type, cb) {
     }, 100);
     
     setTimeout(() => {
-        cb();
+        callback();
     }, 1500);
 }
 
@@ -933,10 +996,22 @@ function renderPromoList() {
     if (!list) return;
     
     list.innerHTML = `
-        <div class="promo-item"><span>START</span><span>+100💰</span></div>
-        <div class="promo-item"><span>GIFT</span><span>+300💰</span></div>
-        <div class="promo-item"><span>POWER</span><span>Сила +1</span></div>
-        <div class="promo-item"><span>TURBO</span><span>Бесплатный турбо</span></div>
+        <div class="promo-item">
+            <span class="promo-code">START</span>
+            <span class="promo-reward">+100💰</span>
+        </div>
+        <div class="promo-item">
+            <span class="promo-code">GIFT</span>
+            <span class="promo-reward">+300💰</span>
+        </div>
+        <div class="promo-item">
+            <span class="promo-code">POWER</span>
+            <span class="promo-reward">Сила +1</span>
+        </div>
+        <div class="promo-item">
+            <span class="promo-code">TURBO</span>
+            <span class="promo-reward">Бесплатный турбо</span>
+        </div>
     `;
 }
 
@@ -1028,6 +1103,7 @@ function updateUI() {
     document.getElementById('totalEarned').textContent = formatNumber(gameState.totalEarned);
     document.getElementById('totalCases').textContent = formatNumber(gameState.casesOpened);
     document.getElementById('bestWin').textContent = formatNumber(gameState.bestCaseWin) + '💰';
+    document.getElementById('totalDays').textContent = formatNumber(gameState.daysActive);
     
     const lvl = Math.floor((isNaN(gameState.totalClicks) ? 0 : gameState.totalClicks) / 100) + 1;
     document.getElementById('playerLevel').textContent = `Уровень ${lvl}`;
