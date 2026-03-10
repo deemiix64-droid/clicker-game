@@ -3,30 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CLICKER 5.2</title>
+    <title>CLICKER 5.4 - ПОЛНАЯ ВЕРСИЯ</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
     <!-- Затемнение при загрузке -->
-    <div class="loading" id="loading">
+    <div class="loading" id="loading" style="display: none;">
         <div class="spinner"></div>
     </div>
 
     <!-- ВХОД -->
     <div class="modal" id="authModal">
-        <div class="modal-window">
-            <h2 class="gradient">🔐 Вход в игру</h2>
+        <div class="modal-content">
+            <h2 class="gradient-text">🔐 Вход в игру</h2>
             <input type="text" id="loginInput" placeholder="Ваш ник" maxlength="20">
             <p class="hint" id="nicknameHint">🔍 Введите ник (мин. 3 символа)</p>
             <div class="modal-buttons">
-                <button class="btn btn-primary" id="loginBtn">Войти</button>
-                <button class="btn btn-secondary" id="loadGameFile">📂 Загрузить .click</button>
+                <button class="btn-primary" id="loginBtn">Войти</button>
+                <button class="btn-secondary" id="loadGameFile">📂 Загрузить .click</button>
             </div>
         </div>
     </div>
 
     <!-- ИГРА -->
-    <div class="game" id="gameContainer">
+    <div class="game" id="gameContainer" style="display: none;">
         
         <!-- Верхняя панель -->
         <div class="header">
@@ -43,7 +43,7 @@
             </div>
         </div>
 
-        <!-- Меню -->
+        <!-- Боковое меню -->
         <div class="menu" id="sideMenu">
             <div class="menu-header">
                 <span>Меню</span>
@@ -66,15 +66,15 @@
 
         <!-- Статистика -->
         <div class="stats-row">
-            <div class="stat-item">
+            <div class="stat-card">
                 <span class="stat-icon">💰</span>
                 <span class="stat-value" id="balance">0</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-card">
                 <span class="stat-icon">⚡</span>
                 <span class="stat-value" id="power">1</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-card">
                 <span class="stat-icon">📈</span>
                 <span class="stat-value" id="cps">0</span>
             </div>
@@ -88,7 +88,7 @@
             </button>
         </div>
 
-        <!-- Быстрые кнопки -->
+        <!-- Быстрые действия -->
         <div class="quick-row">
             <button class="quick-btn" id="dailyBtn">
                 <span>📅</span>
@@ -104,9 +104,15 @@
             </button>
         </div>
 
-        <!-- Контент -->
+        <!-- Индикатор турбо -->
+        <div class="turbo-indicator" id="turboIndicator" style="display: none;">
+            <span>⚡ ТУРБО РЕЖИМ ⚡</span>
+        </div>
+
+        <!-- Контентная область -->
         <div class="content" id="content">
-            <!-- Профиль -->
+            
+            <!-- ПРОФИЛЬ -->
             <div class="tab active" id="profile">
                 <div class="profile-header">
                     <div class="profile-avatar">👤</div>
@@ -115,78 +121,83 @@
                         <div class="profile-level" id="profileLevel">Уровень 1</div>
                     </div>
                 </div>
+                
                 <div class="stats-list">
-                    <div class="stat-line">
+                    <div class="stat-row">
                         <span>Всего кликов:</span>
-                        <span class="stat-value" id="totalClicks">0</span>
+                        <span class="stat-highlight" id="totalClicks">0</span>
                     </div>
-                    <div class="stat-line">
+                    <div class="stat-row">
                         <span>Заработано:</span>
-                        <span class="stat-value" id="totalEarned">0</span>
+                        <span class="stat-highlight" id="totalEarned">0</span>
                     </div>
-                    <div class="stat-line">
-                        <span>Кейсов:</span>
-                        <span class="stat-value" id="totalCases">0</span>
+                    <div class="stat-row">
+                        <span>Кейсов открыто:</span>
+                        <span class="stat-highlight" id="totalCases">0</span>
                     </div>
-                    <div class="stat-line">
-                        <span>Лучший:</span>
-                        <span class="stat-value" id="bestWin">0💰</span>
+                    <div class="stat-row">
+                        <span>Лучший выигрыш:</span>
+                        <span class="stat-highlight" id="bestWin">0💰</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Дней в игре:</span>
+                        <span class="stat-highlight" id="totalDays">1</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Магазин -->
+            <!-- МАГАЗИН -->
             <div class="tab" id="shop">
                 <h3>🏪 Магазин</h3>
-                <div class="grid-2" id="shopGrid"></div>
+                <div class="shop-grid" id="shopGrid"></div>
             </div>
 
-            <!-- Скины -->
+            <!-- СКИНЫ -->
             <div class="tab" id="skins">
                 <h3>🎨 Скины</h3>
-                <div class="grid-2" id="skinsGrid"></div>
+                <div class="skins-grid" id="skinsGrid"></div>
             </div>
 
-            <!-- Кейсы -->
+            <!-- КЕЙСЫ -->
             <div class="tab" id="cases">
                 <h3>🎁 Кейсы</h3>
-                <div class="grid-3" id="casesGrid"></div>
+                <div class="cases-grid" id="casesGrid"></div>
             </div>
 
-            <!-- Промокоды -->
+            <!-- ПРОМОКОДЫ -->
             <div class="tab" id="promo">
                 <h3>🎫 Промокоды</h3>
-                <div class="promo-input">
-                    <input type="text" id="promoInput" placeholder="Введите код">
-                    <button class="btn btn-primary" id="activatePromo">Активировать</button>
+                <div class="promo-container">
+                    <input type="text" id="promoInput" placeholder="Введите промокод">
+                    <button class="btn-primary" id="activatePromo">Активировать</button>
                 </div>
                 <div class="promo-list" id="promoList"></div>
             </div>
 
-            <!-- Лидеры -->
+            <!-- ЛИДЕРЫ -->
             <div class="tab" id="leaders">
-                <h3>🏆 Лидеры</h3>
+                <h3>🏆 Таблица лидеров</h3>
                 <div class="leaderboard" id="leaderboard"></div>
             </div>
 
-            <!-- Настройки -->
+            <!-- НАСТРОЙКИ -->
             <div class="tab" id="settings">
                 <h3>⚙️ Настройки</h3>
                 <div class="settings-list">
-                    <label class="setting">
-                        <span>Уведомления</span>
+                    <label class="setting-item">
+                        <span>🔔 Уведомления</span>
                         <input type="checkbox" id="notificationsCheck" checked>
                     </label>
-                    <label class="setting">
-                        <span>Вибрация</span>
+                    <label class="setting-item">
+                        <span>📳 Вибрация</span>
                         <input type="checkbox" id="vibrationCheck" checked>
                     </label>
-                    <label class="setting">
-                        <span>Звуки</span>
+                    <label class="setting-item">
+                        <span>🔊 Звуки</span>
                         <input type="checkbox" id="soundsCheck" checked>
                     </label>
-                    <label class="setting">
-                        <span>Автосохранение</span>
+                    <label class="setting-item">
+                        <span>💾 Автосохранение</span>
                         <input type="checkbox" id="autosaveCheck" checked>
                     </label>
                 </div>
@@ -194,73 +205,75 @@
         </div>
 
         <!-- МЕНЮ АВТОКЛИКЕРА -->
-        <div class="auto-panel" id="autoMenu">
-            <div class="auto-header">
+        <div class="auto-menu" id="autoMenu">
+            <div class="auto-menu-header">
                 <span>🤖 Автокликер</span>
                 <button class="close-btn" id="closeAutoMenu">✕</button>
             </div>
             
-            <div class="auto-stats">
-                <div class="auto-stat">
-                    <span>Уровень</span>
-                    <span class="stat-big" id="autoMenuLevel">1</span>
+            <div class="auto-menu-content">
+                <div class="auto-stats">
+                    <div class="auto-stat">
+                        <span>Уровень</span>
+                        <span class="auto-value" id="autoMenuLevel">1</span>
+                    </div>
+                    <div class="auto-stat">
+                        <span>Куплено</span>
+                        <span class="auto-value" id="autoMenuCount">0</span>
+                    </div>
+                    <div class="auto-stat">
+                        <span>Доход</span>
+                        <span class="auto-value" id="autoMenuIncome">0/сек</span>
+                    </div>
                 </div>
-                <div class="auto-stat">
-                    <span>Куплено</span>
-                    <span class="stat-big" id="autoMenuCount">0</span>
-                </div>
-                <div class="auto-stat">
-                    <span>Доход</span>
-                    <span class="stat-big" id="autoMenuIncome">0/с</span>
-                </div>
-            </div>
 
-            <div class="auto-timer">
-                <div class="timer-display" id="autoMenuTimer">2:00</div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="autoMenuProgress"></div>
+                <div class="auto-timer-block">
+                    <div class="timer-display" id="autoMenuTimer">2:00</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="autoMenuProgress"></div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="turbo-block" id="turboSection">
-                <div class="turbo-status">
-                    <span class="turbo-icon">⚡</span>
-                    <span id="turboStatus">Турбо выкл</span>
+                <div class="turbo-block" id="turboSection">
+                    <div class="turbo-status">
+                        <span class="turbo-icon">⚡</span>
+                        <span id="turboStatus">Турбо режим выключен</span>
+                    </div>
+                    <div class="turbo-timer" id="turboTimer">0:00</div>
+                    <div class="progress-bar small">
+                        <div class="progress-fill" id="turboProgress"></div>
+                    </div>
                 </div>
-                <div class="turbo-timer" id="turboTimer">0:00</div>
-                <div class="progress-bar small">
-                    <div class="progress-fill" id="turboProgress"></div>
-                </div>
-            </div>
 
-            <div class="auto-buttons">
-                <button class="auto-btn primary" id="autoMenuStart">
-                    <span>▶️</span>
-                    <span>Запустить</span>
-                </button>
-                <button class="auto-btn" id="autoMenuUpgrade">
-                    <span>⬆️</span>
-                    <span>Улучшить</span>
-                    <span class="price" id="upgradePrice">100💰</span>
-                </button>
-                <button class="auto-btn turbo" id="autoMenuTurbo">
-                    <span>⚡</span>
-                    <span>Турбо</span>
-                    <span class="price">50💰</span>
-                </button>
+                <div class="auto-buttons">
+                    <button class="auto-btn primary" id="autoMenuStart">
+                        <span>▶️</span>
+                        <span>Запустить</span>
+                    </button>
+                    <button class="auto-btn" id="autoMenuUpgrade">
+                        <span>⬆️</span>
+                        <span>Улучшить</span>
+                        <span class="price" id="upgradePrice">100💰</span>
+                    </button>
+                    <button class="auto-btn turbo" id="autoMenuTurbo">
+                        <span>⚡</span>
+                        <span>Турбо</span>
+                        <span class="price">50💰</span>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- ПОДАРОК -->
+        <!-- ПЛАВАЮЩИЙ ПОДАРОК -->
         <div class="gift" id="floatingGift">
             <div class="gift-icon">🎁</div>
-            <div class="gift-time" id="giftTimer">24:00</div>
+            <div class="gift-timer" id="giftTimer">24:00</div>
         </div>
     </div>
 
-    <!-- Анимация кейса -->
-    <div class="case-anim" id="caseAnimation">
-        <div class="case-window">
+    <!-- АНИМАЦИЯ КЕЙСА -->
+    <div class="case-animation" id="caseAnimation">
+        <div class="case-content">
             <div class="case-box" id="caseBox">📦</div>
             <div class="case-text" id="caseText">Открываем...</div>
             <div class="case-result" id="caseResult"></div>
@@ -268,8 +281,8 @@
         </div>
     </div>
 
-    <!-- Уведомления -->
-    <div class="notify" id="notifications"></div>
+    <!-- УВЕДОМЛЕНИЯ -->
+    <div class="notifications" id="notifications"></div>
 
     <script src="script.js"></script>
 </body>
