@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>CLICKER 4.1</title>
+    <title>CLICKER 4.6</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
+    <!-- Затемнение фона при загрузке -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+
     <!-- Модальное окно входа -->
     <div class="modal-overlay" id="authModal">
         <div class="modal-content">
@@ -33,7 +38,6 @@
                 <div class="player-details">
                     <span class="player-name" id="playerName">Игрок</span>
                     <span class="player-level" id="playerLevel">Уровень 1</span>
-                    <span class="player-club" id="playerClub">⚡ Нет клуба</span>
                 </div>
             </div>
             
@@ -51,13 +55,10 @@
             </div>
             <div class="menu-items">
                 <button class="menu-item active" data-tab="profile">👤 Профиль</button>
-                <button class="menu-item" data-tab="friends">👥 Друзья</button>
-                <button class="menu-item" data-tab="clubs">🏰 Клубы</button>
-                <button class="menu-item" data-tab="cases">🎁 Кейсы</button>
                 <button class="menu-item" data-tab="shop">🏪 Магазин</button>
                 <button class="menu-item" data-tab="skins">🎨 Скины</button>
+                <button class="menu-item" data-tab="cases">🎁 Кейсы</button>
                 <button class="menu-item" data-tab="promo">🎫 Промокоды</button>
-                <button class="menu-item" data-tab="leaders">🏆 Топ</button>
                 <button class="menu-item" data-tab="settings">⚙️ Настройки</button>
             </div>
             <div class="menu-footer">
@@ -67,16 +68,16 @@
         </div>
 
         <!-- Статистика -->
-        <div class="stats-panel">
-            <div class="stat-card">
+        <div class="stats-grid">
+            <div class="stat-item">
                 <span class="stat-icon">💰</span>
                 <span class="stat-value" id="balance">0</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-item">
                 <span class="stat-icon">⚡</span>
                 <span class="stat-value" id="power">1</span>
             </div>
-            <div class="stat-card">
+            <div class="stat-item">
                 <span class="stat-icon">📈</span>
                 <span class="stat-value" id="cps">0</span>
             </div>
@@ -91,173 +92,151 @@
         </div>
 
         <!-- Быстрые действия -->
-        <div class="action-row">
-            <button class="action-btn" id="dailyBtn">
-                <span class="action-icon">📅</span>
-                <span class="action-text">День</span>
+        <div class="quick-actions">
+            <button class="quick-btn" id="dailyBtn">
+                <span class="quick-icon">📅</span>
+                <span class="quick-text">День</span>
             </button>
-            <button class="action-btn" id="casesBtn">
-                <span class="action-icon">🎁</span>
-                <span class="action-text">Кейсы</span>
+            <button class="quick-btn" id="casesBtn">
+                <span class="quick-icon">🎁</span>
+                <span class="quick-text">Кейсы</span>
             </button>
-            <button class="action-btn" id="quickFriendsBtn">
-                <span class="action-icon">👥</span>
-                <span class="action-text">Друзья</span>
+            <button class="quick-btn" id="shopBtn">
+                <span class="quick-icon">🏪</span>
+                <span class="quick-text">Магазин</span>
             </button>
         </div>
 
         <!-- Контентная область -->
-        <div class="content-wrapper" id="contentWrapper">
+        <div class="content-area" id="contentArea">
             
             <!-- ПРОФИЛЬ -->
             <div class="tab-content active" id="profile">
                 <div class="profile-header">
-                    <div class="profile-avatar-large" id="profileAvatar">👤</div>
+                    <div class="profile-avatar">👤</div>
                     <div class="profile-info">
-                        <h2 id="profileName">Игрок</h2>
-                        <div class="profile-badge" id="profileLevelBadge">Уровень 1</div>
-                        <div class="profile-club" id="profileClubBadge">⚡ Без клуба</div>
+                        <div class="profile-name" id="profileName">Игрок</div>
+                        <div class="profile-level" id="profileLevel">Уровень 1</div>
                     </div>
                 </div>
                 
-                <div class="stats-grid-detailed">
-                    <div class="stat-detailed">
-                        <span class="stat-label">Всего кликов</span>
-                        <span class="stat-number" id="profileClicks">0</span>
-                    </div>
-                    <div class="stat-detailed">
-                        <span class="stat-label">Заработано</span>
-                        <span class="stat-number" id="profileEarned">0</span>
-                    </div>
-                    <div class="stat-detailed">
-                        <span class="stat-label">Кейсы</span>
-                        <span class="stat-number" id="profileBoxes">0</span>
-                    </div>
-                    <div class="stat-detailed">
-                        <span class="stat-label">Дней</span>
-                        <span class="stat-number" id="profileDays">1</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ДРУЗЬЯ -->
-            <div class="tab-content" id="friends">
-                <!-- ... существующий код друзей ... -->
-            </div>
-
-            <!-- КЛУБЫ -->
-            <div class="tab-content" id="clubs">
-                <!-- ... существующий код клубов ... -->
-            </div>
-
-            <!-- КЕЙСЫ (НОВОЕ МЕНЮ) -->
-            <div class="tab-content" id="cases">
-                <h3>🎁 Кейсы</h3>
-                
-                <div class="cases-grid">
-                    <!-- Обычный кейс -->
-                    <div class="case-card" id="caseOrdinary">
-                        <div class="case-icon">📦</div>
-                        <div class="case-name">Обычный кейс</div>
-                        <div class="case-price">100💰</div>
-                        <div class="case-chance">
-                            <span>50💰 - 50%</span>
-                            <span>100💰 - 30%</span>
-                            <span>200💰 - 15%</span>
-                            <span>500💰 - 5%</span>
-                        </div>
-                        <button class="case-open-btn" onclick="openCase('ordinary')">Открыть</button>
-                    </div>
-
-                    <!-- Редкий кейс -->
-                    <div class="case-card rare">
-                        <div class="case-icon">💎</div>
-                        <div class="case-name">Редкий кейс</div>
-                        <div class="case-price">500💰</div>
-                        <div class="case-chance">
-                            <span>100💰 - 40%</span>
-                            <span>250💰 - 30%</span>
-                            <span>500💰 - 20%</span>
-                            <span>1000💰 - 10%</span>
-                        </div>
-                        <button class="case-open-btn" onclick="openCase('rare')">Открыть</button>
-                    </div>
-
-                    <!-- Эпический кейс -->
-                    <div class="case-card epic">
-                        <div class="case-icon">👑</div>
-                        <div class="case-name">Эпический кейс</div>
-                        <div class="case-price">1000💰</div>
-                        <div class="case-chance">
-                            <span>500💰 - 50%</span>
-                            <span>1000💰 - 30%</span>
-                            <span>2000💰 - 15%</span>
-                            <span>5000💰 - 5%</span>
-                        </div>
-                        <button class="case-open-btn" onclick="openCase('epic')">Открыть</button>
-                    </div>
-                </div>
-
-                <div class="cases-stats">
+                <div class="profile-stats">
                     <div class="stat-row">
-                        <span>Всего открыто:</span>
-                        <span id="totalCasesOpened">0</span>
+                        <span>Всего кликов:</span>
+                        <span id="profileClicks">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Заработано:</span>
+                        <span id="profileEarned">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Кейсов открыто:</span>
+                        <span id="profileCases">0</span>
                     </div>
                     <div class="stat-row">
                         <span>Лучший выигрыш:</span>
-                        <span id="bestCaseWin">0💰</span>
+                        <span id="profileBestWin">0</span>
                     </div>
                 </div>
             </div>
 
             <!-- МАГАЗИН -->
             <div class="tab-content" id="shop">
-                <!-- ... существующий код магазина ... -->
+                <h3>🏪 Магазин</h3>
+                <div class="shop-grid" id="shopGrid"></div>
             </div>
 
             <!-- СКИНЫ -->
             <div class="tab-content" id="skins">
-                <!-- ... существующий код скинов ... -->
+                <h3>🎨 Скины</h3>
+                <div class="skins-grid" id="skinsGrid"></div>
+            </div>
+
+            <!-- КЕЙСЫ -->
+            <div class="tab-content" id="cases">
+                <h3>🎁 Кейсы</h3>
+                <div class="cases-grid" id="casesGrid"></div>
             </div>
 
             <!-- ПРОМОКОДЫ -->
             <div class="tab-content" id="promo">
-                <!-- ... существующий код промокодов ... -->
-            </div>
-
-            <!-- ТОП -->
-            <div class="tab-content" id="leaders">
-                <!-- ... существующий код лидеров ... -->
+                <h3>🎫 Промокоды</h3>
+                <div class="promo-container">
+                    <input type="text" id="promoInput" placeholder="Введите промокод">
+                    <button class="btn-primary" id="activatePromo">Активировать</button>
+                </div>
+                <div class="promo-list" id="promoList"></div>
             </div>
 
             <!-- НАСТРОЙКИ -->
             <div class="tab-content" id="settings">
-                <!-- ... существующий код настроек ... -->
+                <h3>⚙️ Настройки</h3>
+                <div class="settings-list">
+                    <div class="setting-item">
+                        <span>Уведомления</span>
+                        <label class="switch">
+                            <input type="checkbox" id="notificationsCheck" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <span>Вибрация</span>
+                        <label class="switch">
+                            <input type="checkbox" id="vibrationCheck" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <span>Автосохранение</span>
+                        <label class="switch">
+                            <input type="checkbox" id="autosaveCheck" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- АНИМАЦИЯ ОТКРЫТИЯ КЕЙСА -->
-        <div class="case-animation-overlay" id="caseAnimation" style="display: none;">
-            <div class="case-animation-container">
-                <div class="case-animation-box" id="caseAnimationBox">📦</div>
-                <div class="case-animation-text" id="caseAnimationText">Открываем...</div>
-                <div class="case-animation-result" id="caseAnimationResult"></div>
-                <button class="case-animation-close" id="closeCaseAnimation">✕</button>
+        <!-- АВТОКЛИКЕР -->
+        <div class="auto-clicker" id="autoClicker">
+            <div class="auto-header">
+                <span class="auto-icon">🤖</span>
+                <span class="auto-level" id="autoLevel">Ур.1</span>
+            </div>
+            <div class="auto-status" id="autoStatus">⏸️</div>
+            <div class="auto-timer" id="autoTimer">2:00</div>
+            <div class="auto-progress">
+                <div class="progress-bar" id="autoProgress"></div>
+            </div>
+            <div class="auto-controls">
+                <button class="auto-btn" id="autoStartBtn">▶️</button>
+                <button class="auto-btn" id="autoUpgradeBtn">⬆️</button>
+                <button class="auto-btn" id="autoBoostBtn">⚡</button>
+                <div class="auto-drag" id="autoDrag">⋮⋮</div>
             </div>
         </div>
 
-        <!-- ПЛАВАЮЩАЯ КНОПКА ПОДАРКА -->
+        <!-- ПЛАВАЮЩИЙ ПОДАРОК -->
         <div class="floating-gift" id="floatingGift">
             <div class="gift-icon">🎁</div>
             <div class="gift-timer" id="giftTimer">24:00</div>
-            <div class="gift-drag-handle" id="giftDragHandle">⋮⋮</div>
+            <div class="gift-drag" id="giftDrag">⋮⋮</div>
         </div>
     </div>
 
-    <!-- Уведомления -->
-    <div class="notification-container" id="notifications"></div>
+    <!-- АНИМАЦИЯ КЕЙСА -->
+    <div class="case-animation" id="caseAnimation">
+        <div class="case-content">
+            <div class="case-box" id="caseBox">📦</div>
+            <div class="case-text" id="caseText">Открываем...</div>
+            <div class="case-result" id="caseResult"></div>
+            <button class="case-close" id="closeCaseAnimation">✕</button>
+        </div>
+    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- УВЕДОМЛЕНИЯ -->
+    <div class="notifications" id="notifications"></div>
+
     <script src="script.js"></script>
 </body>
 </html>
