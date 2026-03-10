@@ -6,14 +6,18 @@ let gameState = {
     totalEarned: 0,
     autoclickers: 0,
     power: 1,
-    boxesOpened: 0,
+    casesOpened: 0,
+    bestCaseWin: 0,
     daysActive: 1,
     skin: 'red',
     ownedSkins: ['red'],
     lastDaily: null,
+    lastGift: null,
     usedCodes: [],
     friends: [],
+    friendRequests: [],
     club: null,
+    clubRequests: [],
     settings: {
         notifications: true,
         sounds: true,
@@ -22,159 +26,512 @@ let gameState = {
     },
     booster: { active: false, timeLeft: 0 },
     turbo: { active: false, timeLeft: 0 },
-    autoClicker: { enabled: false, timeLeft: 0, maxTime: 120 },
-    autoPosition: { x: window.innerWidth - 110, y: window.innerHeight - 150 },
-    version: '3.7'
+    autoClicker: { 
+        enabled: false, 
+        timeLeft: 0, 
+        maxTime: 120,
+        level: 1,
+        baseIncome: 1
+    },
+    autoPosition: { x: window.innerWidth - 160, y: window.innerHeight - 200 },
+    giftPosition: { x: window.innerWidth - 85, y: window.innerHeight - 180 },
+    version: '4.2'
 };
 
-// ========== БАЗА ДАННЫХ НИКОВ ==========
-let nicknamesDB = new Set();
+// ========== ЛОКАЛЬНОЕ СОХРАНЕНИЕ ==========
+const SAVE_KEY = 'clicker_game_save';
 
-// Загрузка существующих ников из localStorage
-function loadNicknamesDB() {
-    const saved = localStorage.getItem('nicknames_db');
-    if (saved) {
-        nicknamesDB = new Set(JSON.parse(saved));
-    } else {
-        // Добавляем тестовые ники
-        nicknamesDB.add('admin');
-        nicknamesDB.add('test');
-        nicknamesDB.add('player1');
+function loadLocalSave() {
+    try {
+        const saved = localStorage.getItem(SAVE_KEY);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.version && parsed.version >= '4.0') {
+                gameState = { ...gameState, ...parsed };
+                console.log('✅ Локальное сохранение загружено');
+                return true;
+            }
+        }
+    } catch (e) {
+        console.error('Ошибка загрузки:', e);
+    }
+    return false;
+}
+
+function saveLocalSave() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
+        console.log('💾 Игра сохранена');
+        return true;
+    } catch (e) {
+        console.error('Ошибка сохранения:', e);
+        return false;
     }
 }
 
-// Сохранение базы ников
-function saveNicknamesDB() {
-    localStorage.setItem('nicknames_db', JSON.stringify([...nicknamesDB]));
+// ========== ЗАГРУЗКА .CLICK ФАЙЛА (ИСПРАВЛЕНО) ==========
+function loadClickFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.click,.json';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(event) {
+            try {
+                // Пробуем распарсить как JSON
+                const content = event.target.result;
+                let loadedData;
+                
+                try {
+                    loadedData = JSON.parse(content);
+                } catch (jsonError) {
+                    // Если не JSON, возможно это старый формат
+                    showNotification('Ошибка', 'Неверный формат файла', 'error');
+                    return;
+                }
+                
+                // Проверяем структуру
+                if (!loadedData || typeof loadedData !== 'object') {
+                    throw new Error('Неверный формат данных');
+                }
+                
+                // Загружаем данные
+                gameState = { ...gameState, ...loadedData };
+                
+                // Обновляем интерфейс
+                document.getElementById('playerName').textContent = gameState.nickname || 'Игрок';
+                document.getElementById('profileName').textContent = gameState.nickname || 'Игрок';
+                document.getElementById('authModal').style.display = 'none';
+                document.getElementById('gameContainer').style.display = 'block';
+                
+                // Восстанавливаем позиции
+                restorePositions();
+                
+                // Обновляем UI
+                updateUI();
+                renderSkins();
+                
+                showNotification('Успешно!', 'Игра загружена из файла', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                showNotification('Ошибка загрузки', 'Файл поврежден или имеет неверный формат', 'error');
+            } finally {
+                document.body.removeChild(input);
+            }
+        };
+        
+        reader.onerror = function() {
+            showNotification('Ошибка', 'Не удалось прочитать файл', 'error');
+            document.body.removeChild(input);
+        };
+        
+        reader.readAsText(file);
+    };
+    
+    input.click();
 }
 
-// Проверка уникальности ника
-function isNicknameUnique(nickname) {
-    return !nicknamesDB.has(nickname.toLowerCase());
+// ========== ВОССТАНОВЛЕНИЕ ПОЗИЦИЙ ==========
+function restorePositions() {
+    const autoElement = document.getElementById('autoClicker');
+    const giftElement = document.getElementById('floatingGift');
+    
+    if (autoElement) {
+        if (gameState.autoPosition) {
+            autoElement.style.left = gameState.autoPosition.x + 'px';
+            autoElement.style.top = gameState.autoPosition.y + 'px';
+            autoElement.style.right = 'auto';
+            autoElement.style.bottom = 'auto';
+        } else {
+            // Позиция по умолчанию
+            autoElement.style.right = '15px';
+            autoElement.style.bottom = '200px';
+        }
+    }
+    
+    if (giftElement) {
+        if (gameState.giftPosition) {
+            giftElement.style.left = gameState.giftPosition.x + 'px';
+            giftElement.style.top = gameState.giftPosition.y + 'px';
+            giftElement.style.right = 'auto';
+            giftElement.style.bottom = 'auto';
+        } else {
+            // Позиция по умолчанию
+            giftElement.style.right = '15px';
+            giftElement.style.bottom = '100px';
+        }
+    }
 }
 
-// Добавление нового ника
-function addNickname(nickname) {
-    nicknamesDB.add(nickname.toLowerCase());
-    saveNicknamesDB();
+// ========== ПЕРЕДВИЖЕНИЕ АВТОКЛИКЕРА ==========
+let isDragging = false;
+let currentElement = null;
+
+function makeDraggable(element, savePositionKey) {
+    if (!element) return;
+    
+    let startX, startY, startLeft, startTop;
+    
+    function startDrag(e) {
+        // Не реагируем на клики по кнопкам
+        if (e.target.closest('button') && !e.target.closest('.auto-drag, .gift-drag-handle')) {
+            return;
+        }
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        isDragging = true;
+        currentElement = element;
+        element.classList.add('dragging');
+        
+        const clientX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
+        
+        startX = clientX;
+        startY = clientY;
+        
+        const rect = element.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+        
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('touchmove', onDrag, { passive: false });
+        document.addEventListener('mouseup', stopDrag);
+        document.addEventListener('touchend', stopDrag);
+    }
+    
+    function onDrag(e) {
+        if (!isDragging || currentElement !== element) return;
+        e.preventDefault();
+        
+        const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
+        
+        let newLeft = startLeft + (clientX - startX);
+        let newTop = startTop + (clientY - startY);
+        
+        // Ограничения
+        newLeft = Math.max(0, Math.min(window.innerWidth - element.offsetWidth, newLeft));
+        newTop = Math.max(0, Math.min(window.innerHeight - element.offsetHeight, newTop));
+        
+        element.style.left = newLeft + 'px';
+        element.style.top = newTop + 'px';
+        element.style.right = 'auto';
+        element.style.bottom = 'auto';
+    }
+    
+    function stopDrag() {
+        if (!isDragging || currentElement !== element) return;
+        
+        isDragging = false;
+        currentElement = null;
+        element.classList.remove('dragging');
+        
+        // Сохраняем позицию
+        const rect = element.getBoundingClientRect();
+        gameState[savePositionKey] = {
+            x: rect.left,
+            y: rect.top
+        };
+        saveLocalSave();
+        
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('touchmove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+        document.removeEventListener('touchend', stopDrag);
+    }
+    
+    // Добавляем обработчики на весь элемент для возможности перетаскивания за любую часть
+    element.addEventListener('mousedown', startDrag);
+    element.addEventListener('touchstart', startDrag, { passive: false });
 }
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎮 CLICKER 3.7 загружается...');
+    console.log('🎮 CLICKER 4.2 загружается...');
     
-    loadNicknamesDB();
+    // Загружаем локальное сохранение
+    if (loadLocalSave() && gameState.nickname) {
+        document.getElementById('playerName').textContent = gameState.nickname;
+        document.getElementById('profileName').textContent = gameState.nickname;
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('gameContainer').style.display = 'block';
+        
+        restorePositions();
+        showNotification('Добро пожаловать!', `С возвращением, ${gameState.nickname}!`, 'success');
+    }
     
     // Загружаем тему
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
-    document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    
+    // Делаем элементы перетаскиваемыми
+    setTimeout(() => {
+        const autoElement = document.getElementById('autoClicker');
+        const giftElement = document.getElementById('floatingGift');
+        
+        if (autoElement) {
+            makeDraggable(autoElement, 'autoPosition');
+        }
+        if (giftElement) {
+            makeDraggable(giftElement, 'giftPosition');
+        }
+    }, 100);
     
     // Инициализация
     initEventListeners();
-    checkWindowSize();
-    
-    // Следим за изменением размера окна
-    window.addEventListener('resize', checkWindowSize);
-});
-
-// ========== ПРОВЕРКА РАЗМЕРА ЭКРАНА ==========
-function checkWindowSize() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    // Адаптация для планшетов
-    if (width >= 768 && width <= 1024) {
-        document.body.classList.add('tablet');
-    } else {
-        document.body.classList.remove('tablet');
-    }
-    
-    // Для очень маленьких телефонов
-    if (width <= 360) {
-        document.body.classList.add('x-small');
-    } else {
-        document.body.classList.remove('x-small');
-    }
-    
-    // Для поворота экрана
-    if (width > height) {
-        document.body.classList.add('landscape');
-    } else {
-        document.body.classList.remove('landscape');
-    }
-}
-
-// ========== УСТАНОВКА ТЕМЫ ==========
-function setTheme(theme) {
-    document.body.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    document.getElementById('themeToggle').textContent = 
-        theme === 'dark' ? '🌙' : 
-        theme === 'light' ? '☀️' : 
-        theme === 'neon' ? '🌈' : '🌲';
-}
-
-// Переключение темы
-document.getElementById('themeToggle').addEventListener('click', () => {
-    const themes = ['dark', 'light', 'neon', 'forest'];
-    const current = document.body.getAttribute('data-theme') || 'dark';
-    const next = themes[(themes.indexOf(current) + 1) % themes.length];
-    setTheme(next);
-    showNotification('Тема изменена', `Активирована ${next} тема`, 'info');
-});
-
-// ========== ПРОВЕРКА НИКА В РЕАЛЬНОМ ВРЕМЕНИ ==========
-document.getElementById('loginInput').addEventListener('input', (e) => {
-    const nickname = e.target.value.trim();
-    const hint = document.getElementById('nicknameHint');
-    const loginBtn = document.getElementById('loginBtn');
-    
-    if (nickname.length < 3) {
-        hint.textContent = '❌ Минимум 3 символа';
-        hint.style.color = '#d63031';
-        loginBtn.disabled = true;
-    } else if (!isNicknameUnique(nickname)) {
-        hint.textContent = '❌ Этот ник уже занят';
-        hint.style.color = '#d63031';
-        loginBtn.disabled = true;
-    } else {
-        hint.textContent = '✅ Ник доступен';
-        hint.style.color = '#00b894';
-        loginBtn.disabled = false;
-    }
-});
-
-// ========== ВХОД ==========
-document.getElementById('loginBtn').addEventListener('click', () => {
-    const nickname = document.getElementById('loginInput').value.trim();
-    
-    if (!nickname || nickname.length < 3) {
-        showNotification('Ошибка', 'Ник должен быть минимум 3 символа', 'error');
-        return;
-    }
-    
-    if (!isNicknameUnique(nickname)) {
-        showNotification('Ошибка', 'Этот ник уже занят', 'error');
-        return;
-    }
-    
-    // Регистрируем ник
-    addNickname(nickname);
-    
-    gameState.nickname = nickname;
-    document.getElementById('playerName').textContent = nickname;
-    document.getElementById('authModal').style.display = 'none';
-    document.getElementById('gameContainer').style.display = 'block';
-    
-    showNotification('Добро пожаловать!', `Привет, ${nickname}!`, 'success');
     startGameLoop();
     updateUI();
 });
 
-// ========== ПОКАЗ УВЕДОМЛЕНИЙ ==========
+// ========== ИНИЦИАЛИЗАЦИЯ ОБРАБОТЧИКОВ ==========
+function initEventListeners() {
+    // Загрузка из файла
+    document.getElementById('loadGameFile').addEventListener('click', loadClickFile);
+    
+    // Вход
+    document.getElementById('loginBtn').addEventListener('click', () => {
+        const nickname = document.getElementById('loginInput').value.trim();
+        
+        if (!nickname || nickname.length < 3) {
+            showNotification('Ошибка', 'Ник должен быть минимум 3 символа', 'error');
+            return;
+        }
+        
+        gameState.nickname = nickname;
+        document.getElementById('playerName').textContent = nickname;
+        document.getElementById('profileName').textContent = nickname;
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('gameContainer').style.display = 'block';
+        
+        saveLocalSave();
+        showNotification('Добро пожаловать!', `Привет, ${nickname}!`, 'success');
+        updateUI();
+    });
+    
+    // Меню
+    document.getElementById('menuToggle').addEventListener('click', () => {
+        document.getElementById('sideMenu').classList.add('active');
+    });
+    
+    document.getElementById('closeMenu').addEventListener('click', () => {
+        document.getElementById('sideMenu').classList.remove('active');
+    });
+    
+    document.getElementById('profileBtn').addEventListener('click', () => {
+        document.querySelector('.menu-item[data-tab="profile"]').click();
+    });
+    
+    document.getElementById('casesBtn').addEventListener('click', () => {
+        document.querySelector('.menu-item[data-tab="cases"]').click();
+    });
+    
+    // Навигация по меню
+    document.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', () => {
+            document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            const tabId = item.dataset.tab;
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            document.getElementById('sideMenu').classList.remove('active');
+        });
+    });
+    
+    // Тема
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        const themes = ['dark', 'light', 'neon', 'forest'];
+        const current = document.body.getAttribute('data-theme') || 'dark';
+        const next = themes[(themes.indexOf(current) + 1) % themes.length];
+        setTheme(next);
+        showNotification('Тема изменена', `Активирована ${next} тема`, 'info');
+    });
+    
+    // Клик
+    document.getElementById('clickBtn').addEventListener('click', () => {
+        const multiplier = gameState.turbo.active ? 2 : 1;
+        const gain = gameState.power * multiplier;
+        
+        gameState.balance += gain;
+        gameState.totalClicks++;
+        gameState.totalEarned += gain;
+        
+        const btn = document.getElementById('clickBtn');
+        btn.style.transform = 'scale(0.9)';
+        setTimeout(() => btn.style.transform = '', 100);
+        
+        updateUI();
+    });
+    
+    // Ежедневная награда
+    document.getElementById('dailyBtn').addEventListener('click', () => {
+        const today = new Date().toDateString();
+        
+        if (gameState.lastDaily !== today) {
+            gameState.balance += 500;
+            gameState.lastDaily = today;
+            gameState.daysActive++;
+            showNotification('Ежедневная награда!', '+500 монет', 'success');
+            saveLocalSave();
+            updateUI();
+        } else {
+            showNotification('Уже получали!', 'Возвращайтесь завтра', 'warning');
+        }
+    });
+    
+    // Кейсы
+    document.getElementById('closeCaseAnimation').addEventListener('click', () => {
+        document.getElementById('caseAnimation').style.display = 'none';
+    });
+    
+    // Подарок
+    const giftElement = document.getElementById('floatingGift');
+    if (giftElement) {
+        giftElement.addEventListener('click', (e) => {
+            if (isDragging) return;
+            
+            const now = Date.now();
+            const lastGift = gameState.lastGift || 0;
+            const hours24 = 24 * 60 * 60 * 1000;
+            
+            if (now - lastGift >= hours24) {
+                gameState.balance += 50;
+                gameState.lastGift = now;
+                giftElement.classList.remove('available');
+                showNotification('🎁 Ежедневный подарок!', '+50 монет', 'success');
+                updateUI();
+            } else {
+                const timeLeft = hours24 - (now - lastGift);
+                const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                showNotification('Подарок уже получен', `Следующий через ${hours}ч ${minutes}м`, 'info');
+            }
+        });
+    }
+    
+    // Сохранение в файл
+    document.getElementById('saveToFile').addEventListener('click', () => {
+        const dataStr = JSON.stringify(gameState, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${gameState.nickname || 'player'}_clicker_${Date.now()}.click`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showNotification('Сохранено!', 'Игра сохранена в файл', 'success');
+    });
+    
+    // Выход
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        saveLocalSave();
+        document.getElementById('gameContainer').style.display = 'none';
+        document.getElementById('authModal').style.display = 'flex';
+        document.getElementById('loginInput').value = '';
+        gameState.nickname = '';
+    });
+}
+
+// ========== СИСТЕМА КЕЙСОВ ==========
+window.openCase = (caseType) => {
+    let price, rewards;
+    
+    switch(caseType) {
+        case 'ordinary':
+            price = 100;
+            rewards = [50, 100, 200, 500];
+            break;
+        case 'rare':
+            price = 500;
+            rewards = [100, 250, 500, 1000];
+            break;
+        case 'epic':
+            price = 1000;
+            rewards = [500, 1000, 2000, 5000];
+            break;
+        default:
+            return;
+    }
+    
+    if (gameState.balance < price) {
+        showNotification('Недостаточно средств!', `Нужно ${price}💰`, 'error');
+        return;
+    }
+    
+    showCaseAnimation(caseType, () => {
+        gameState.balance -= price;
+        gameState.casesOpened++;
+        
+        const random = Math.random() * 100;
+        let win;
+        
+        if (random < 50) win = rewards[0];
+        else if (random < 80) win = rewards[1];
+        else if (random < 95) win = rewards[2];
+        else win = rewards[3];
+        
+        gameState.balance += win;
+        
+        if (win > gameState.bestCaseWin) {
+            gameState.bestCaseWin = win;
+        }
+        
+        document.getElementById('caseAnimationResult').innerHTML = `+${win}💰`;
+        document.getElementById('caseAnimationText').textContent = 'Вы выиграли!';
+        
+        saveLocalSave();
+        updateUI();
+    });
+};
+
+function showCaseAnimation(caseType, callback) {
+    const overlay = document.getElementById('caseAnimation');
+    const box = document.getElementById('caseAnimationBox');
+    const text = document.getElementById('caseAnimationText');
+    const result = document.getElementById('caseAnimationResult');
+    
+    box.className = 'case-animation-box';
+    box.textContent = caseType === 'ordinary' ? '📦' : caseType === 'rare' ? '💎' : '👑';
+    text.textContent = 'Открываем кейс...';
+    result.innerHTML = '';
+    
+    overlay.style.display = 'flex';
+    
+    setTimeout(() => {
+        box.classList.add('opening');
+    }, 100);
+    
+    setTimeout(() => {
+        callback();
+    }, 1500);
+}
+
+// ========== ТЕМЫ ==========
+function setTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) {
+        toggle.textContent = theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : theme === 'neon' ? '🌈' : '🌲';
+    }
+}
+
+// ========== УВЕДОМЛЕНИЯ ==========
 function showNotification(title, message, type = 'info') {
     const container = document.getElementById('notifications');
+    if (!container) return;
+    
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `<strong>${title}</strong><br>${message}`;
@@ -186,168 +543,31 @@ function showNotification(title, message, type = 'info') {
     }, 3000);
 }
 
-// ========== МЕНЮ ==========
-document.getElementById('menuToggle').addEventListener('click', () => {
-    document.getElementById('sideMenu').classList.add('active');
-});
-
-document.getElementById('closeMenu').addEventListener('click', () => {
-    document.getElementById('sideMenu').classList.remove('active');
-});
-
-// Навигация
-document.querySelectorAll('.menu-item').forEach(item => {
-    item.addEventListener('click', () => {
-        document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-        
-        const tabId = item.dataset.tab;
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        
-        document.getElementById('sideMenu').classList.remove('active');
-        
-        // Загружаем контент для вкладки
-        switch(tabId) {
-            case 'friends':
-                renderFriends();
-                break;
-            case 'clubs':
-                renderClubs();
-                break;
-            case 'shop':
-                renderShop();
-                break;
-            case 'leaders':
-                renderLeaders();
-                break;
-            case 'settings':
-                renderSettings();
-                break;
-        }
-    });
-});
-
-// ========== ДРУЗЬЯ ==========
-function renderFriends() {
-    const container = document.getElementById('friendsContainer');
-    const friends = [
-        { id: 1, name: 'Киберпанкер', status: 'online', level: 5, avatar: '👾' },
-        { id: 2, name: 'КликерМастер', status: 'offline', level: 12, avatar: '🤖' },
-        { id: 3, name: 'Игрок2026', status: 'online', level: 3, avatar: '👤' }
-    ];
+// ========== ОБНОВЛЕНИЕ ТАЙМЕРА ПОДАРКА ==========
+function updateGiftTimer() {
+    const timerElement = document.getElementById('giftTimer');
+    const giftElement = document.getElementById('floatingGift');
     
-    container.innerHTML = friends.map(friend => `
-        <div class="friend-card">
-            <div class="friend-info">
-                <div class="friend-avatar">${friend.avatar}</div>
-                <div class="friend-details">
-                    <div class="friend-name">${friend.name}</div>
-                    <div class="friend-status ${friend.status}">${friend.status}</div>
-                </div>
-            </div>
-            <div class="friend-actions">
-                <button class="friend-action" onclick="chatWithFriend(${friend.id})">💬</button>
-                <button class="friend-action" onclick="giftFriend(${friend.id})">🎁</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// ========== КЛУБЫ ==========
-function renderClubs() {
-    const container = document.getElementById('clubsContainer');
-    const clubs = [
-        { id: 1, name: 'Киберпанк', icon: '🔥', members: 12, maxMembers: 20, level: 5, balance: 4500 },
-        { id: 2, name: 'Кликеры', icon: '👆', members: 8, maxMembers: 15, level: 3, balance: 2100 }
-    ];
+    if (!timerElement || !giftElement) return;
     
-    container.innerHTML = clubs.map(club => `
-        <div class="club-card">
-            <div class="club-header">
-                <span class="club-icon">${club.icon}</span>
-                <span class="club-name">${club.name}</span>
-                <span class="club-level">Ур.${club.level}</span>
-            </div>
-            <div class="club-stats">
-                <span>👥 ${club.members}/${club.maxMembers}</span>
-                <span>💰 ${club.balance}</span>
-            </div>
-            <button class="club-join" onclick="joinClub(${club.id})">Вступить</button>
-        </div>
-    `).join('');
-}
-
-// ========== МАГАЗИН ==========
-function renderShop() {
-    const grid = document.getElementById('shopGrid');
-    const items = [
-        { id: 'autoclicker', name: 'Автокликер', desc: '+1/сек', price: 50, icon: '🤖' },
-        { id: 'power', name: 'Сила', desc: '+1 к силе', price: 100, icon: '💪' },
-        { id: 'booster', name: 'Бустер', desc: 'x2 30сек', price: 200, icon: '🚀' },
-        { id: 'key', name: 'Ключ', desc: 'Джекпот', price: 150, icon: '🔑' }
-    ];
+    if (!gameState.lastGift) {
+        timerElement.textContent = 'Готов!';
+        giftElement.classList.add('available');
+        return;
+    }
     
-    grid.innerHTML = items.map(item => `
-        <div class="shop-item">
-            <span class="shop-icon">${item.icon}</span>
-            <div class="shop-name">${item.name}</div>
-            <div class="shop-desc">${item.desc}</div>
-            <button class="shop-price" onclick="buyItem('${item.id}', ${item.price})">${item.price}💰</button>
-        </div>
-    `).join('');
-}
-
-// ========== ТОП ИГРОКОВ ==========
-function renderLeaders() {
-    const container = document.getElementById('leaderboard');
-    const leaders = [
-        { name: 'Киберпанкер', score: 15420 },
-        { name: 'КликерМастер', score: 12350 },
-        { name: 'Игрок2026', score: 9870 }
-    ];
+    const now = Date.now();
+    const timeLeft = (24 * 60 * 60 * 1000) - (now - gameState.lastGift);
     
-    container.innerHTML = leaders.map((leader, i) => `
-        <div class="stat-row">
-            <span>${i+1}. ${leader.name}</span>
-            <span>💰 ${leader.score}</span>
-        </div>
-    `).join('');
-}
-
-// ========== НАСТРОЙКИ ==========
-function renderSettings() {
-    const container = document.getElementById('settingsContainer');
-    container.innerHTML = `
-        <div class="stat-row">
-            <span>🔔 Уведомления</span>
-            <label class="switch">
-                <input type="checkbox" ${gameState.settings.notifications ? 'checked' : ''} onchange="toggleSetting('notifications')">
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="stat-row">
-            <span>🔊 Звуки</span>
-            <label class="switch">
-                <input type="checkbox" ${gameState.settings.sounds ? 'checked' : ''} onchange="toggleSetting('sounds')">
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="stat-row">
-            <span>📳 Вибрация</span>
-            <label class="switch">
-                <input type="checkbox" ${gameState.settings.vibration ? 'checked' : ''} onchange="toggleSetting('vibration')">
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="stat-row">
-            <span>💾 Автосохранение</span>
-            <label class="switch">
-                <input type="checkbox" ${gameState.settings.autoSave ? 'checked' : ''} onchange="toggleSetting('autoSave')">
-                <span class="slider"></span>
-            </label>
-        </div>
-    `;
+    if (timeLeft <= 0) {
+        timerElement.textContent = 'Готов!';
+        giftElement.classList.add('available');
+    } else {
+        const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+        const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+        timerElement.textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
+        giftElement.classList.remove('available');
+    }
 }
 
 // ========== ИГРОВОЙ ЦИКЛ ==========
@@ -359,23 +579,22 @@ function startGameLoop() {
         if (gameState.autoClicker.enabled && gameState.autoClicker.timeLeft > 0) {
             gameState.autoClicker.timeLeft--;
             
-            if (gameState.autoclickers > 0) {
-                let multiplier = 1;
-                if (gameState.turbo.active) multiplier = 2;
-                
-                const gain = gameState.autoclickers * gameState.power * multiplier;
-                gameState.balance += gain;
-                gameState.totalEarned += gain;
-                
-                // Анимация
-                const auto = document.getElementById('floatingAuto');
-                auto.style.transform = 'scale(1.1)';
-                setTimeout(() => auto.style.transform = '', 200);
+            const progress = (gameState.autoClicker.timeLeft / gameState.autoClicker.maxTime) * 100;
+            const progressBar = document.getElementById('autoProgress');
+            if (progressBar) {
+                progressBar.style.width = progress + '%';
             }
+            
+            const income = gameState.autoClicker.level * gameState.power;
+            gameState.balance += income;
+            gameState.totalEarned += income;
             
             if (gameState.autoClicker.timeLeft <= 0) {
                 gameState.autoClicker.enabled = false;
-                showNotification('Автокликер остановлен', 'Время вышло', 'info');
+                const status = document.getElementById('autoStatus');
+                const timer = document.getElementById('autoTimer');
+                if (status) status.textContent = '⏸️ Остановлен';
+                if (timer) timer.textContent = '0:00';
             }
         }
         
@@ -384,240 +603,206 @@ function startGameLoop() {
             gameState.turbo.timeLeft--;
             if (gameState.turbo.timeLeft <= 0) {
                 gameState.turbo.active = false;
+                const auto = document.getElementById('autoClicker');
+                if (auto) auto.classList.remove('turbo');
             }
         }
         
         updateUI();
     }, 1000);
+    
+    // Таймер для отображения времени
+    setInterval(() => {
+        if (gameState.autoClicker.enabled) {
+            const minutes = Math.floor(gameState.autoClicker.timeLeft / 60);
+            const seconds = gameState.autoClicker.timeLeft % 60;
+            const timer = document.getElementById('autoTimer');
+            if (timer) {
+                timer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+    }, 500);
+    
+    // Таймер подарка
+    setInterval(updateGiftTimer, 60000);
 }
 
-// ========== ОБНОВЛЕНИЕ ИНТЕРФЕЙСА ==========
+// ========== ОБНОВЛЕНИЕ UI ==========
 function updateUI() {
-    document.getElementById('balance').textContent = Math.floor(gameState.balance);
-    document.getElementById('power').textContent = gameState.power;
-    document.getElementById('cps').textContent = gameState.autoclickers;
-    document.getElementById('autoCount').textContent = gameState.autoclickers;
+    const elements = {
+        balance: document.getElementById('balance'),
+        power: document.getElementById('power'),
+        cps: document.getElementById('cps'),
+        autoCount: document.getElementById('autoCount'),
+        autoLevel: document.getElementById('autoLevel'),
+        profileClicks: document.getElementById('profileClicks'),
+        profileEarned: document.getElementById('profileEarned'),
+        profileBoxes: document.getElementById('profileBoxes'),
+        profileDays: document.getElementById('profileDays'),
+        totalCasesOpened: document.getElementById('totalCasesOpened'),
+        bestCaseWin: document.getElementById('bestCaseWin'),
+        playerLevel: document.getElementById('playerLevel'),
+        profileLevelBadge: document.getElementById('profileLevelBadge'),
+        playerClub: document.getElementById('playerClub'),
+        profileClubBadge: document.getElementById('profileClubBadge'),
+        autoStatus: document.getElementById('autoStatus'),
+        autoStartBtn: document.getElementById('autoStartBtn')
+    };
     
-    // Профиль
-    document.getElementById('profileClicks').textContent = gameState.totalClicks;
-    document.getElementById('profileEarned').textContent = Math.floor(gameState.totalEarned);
-    document.getElementById('profileBoxes').textContent = gameState.boxesOpened;
-    document.getElementById('profileDays').textContent = gameState.daysActive;
+    if (elements.balance) elements.balance.textContent = Math.floor(gameState.balance);
+    if (elements.power) elements.power.textContent = gameState.power;
+    if (elements.cps) elements.cps.textContent = gameState.autoclickers;
+    if (elements.autoCount) elements.autoCount.textContent = gameState.autoclickers;
+    if (elements.autoLevel) elements.autoLevel.textContent = `Ур.${gameState.autoClicker.level}`;
+    
+    if (elements.profileClicks) elements.profileClicks.textContent = gameState.totalClicks;
+    if (elements.profileEarned) elements.profileEarned.textContent = Math.floor(gameState.totalEarned);
+    if (elements.profileBoxes) elements.profileBoxes.textContent = gameState.casesOpened;
+    if (elements.profileDays) elements.profileDays.textContent = gameState.daysActive;
+    
+    if (elements.totalCasesOpened) elements.totalCasesOpened.textContent = gameState.casesOpened;
+    if (elements.bestCaseWin) elements.bestCaseWin.textContent = gameState.bestCaseWin + '💰';
     
     const level = Math.floor(gameState.totalClicks / 100) + 1;
-    document.getElementById('playerLevel').textContent = `Уровень ${level}`;
+    if (elements.playerLevel) elements.playerLevel.textContent = `Уровень ${level}`;
+    if (elements.profileLevelBadge) elements.profileLevelBadge.textContent = `Уровень ${level}`;
     
-    // Автокликер
-    const autoStatus = document.getElementById('autoStatus');
-    const autoTimer = document.getElementById('autoTimer');
-    const autoElement = document.getElementById('floatingAuto');
-    
-    if (gameState.autoClicker.enabled && gameState.autoClicker.timeLeft > 0) {
-        autoStatus.textContent = '▶️';
-        autoTimer.textContent = `+${gameState.autoclickers}/сек`;
-        autoElement.classList.toggle('turbo', gameState.turbo.active);
-    } else {
-        autoStatus.textContent = '⏸️';
-        autoTimer.textContent = '0/сек';
-        autoElement.classList.remove('turbo');
+    if (gameState.club) {
+        if (elements.playerClub) elements.playerClub.textContent = `🏰 ${gameState.club.name}`;
+        if (elements.profileClubBadge) elements.profileClubBadge.textContent = `🏰 ${gameState.club.name}`;
     }
     
-    document.getElementById('autoPowerBtn').textContent = 
-        gameState.autoClicker.enabled ? '⏹️' : '▶️';
+    if (elements.autoStatus) {
+        elements.autoStatus.textContent = gameState.autoClicker.enabled ? '⚡ Работает' : '⏸️ Остановлен';
+    }
+    
+    if (elements.autoStartBtn) {
+        elements.autoStartBtn.textContent = gameState.autoClicker.enabled ? '⏹️' : '▶️';
+    }
+    
+    updateGiftTimer();
+    
+    if (gameState.settings.autoSave) {
+        saveLocalSave();
+    }
 }
 
-// ========== КЛИК ==========
-document.getElementById('clickBtn').addEventListener('click', () => {
-    const multiplier = gameState.turbo.active ? 2 : 1;
-    const gain = gameState.power * multiplier;
+// ========== СКИНЫ ==========
+function renderSkins() {
+    const grid = document.getElementById('skinsGrid');
+    if (!grid) return;
     
-    gameState.balance += gain;
-    gameState.totalClicks++;
-    gameState.totalEarned += gain;
+    const skins = [
+        { id: 'red', name: 'Красный', price: 200 },
+        { id: 'blue', name: 'Синий', price: 200 },
+        { id: 'green', name: 'Зеленый', price: 200 },
+        { id: 'gold', name: 'Золотой', price: 500 },
+        { id: 'rainbow', name: 'Радуга', price: 1000 },
+        { id: 'dark', name: 'Темный', price: 300 }
+    ];
     
-    // Анимация
-    const btn = document.getElementById('clickBtn');
-    btn.style.transform = 'scale(0.9)';
-    setTimeout(() => btn.style.transform = '', 100);
+    grid.innerHTML = skins.map(skin => {
+        const owned = gameState.ownedSkins.includes(skin.id);
+        return `
+            <div class="skin-item" data-skin="${skin.id}" data-price="${skin.price}">
+                <div class="skin-preview skin-${skin.id}"></div>
+                <div class="skin-name">${skin.name}</div>
+                <div class="skin-price">${owned ? '✓ Владеете' : skin.price + '💰'}</div>
+                <button class="skin-buy" ${owned ? 'disabled' : ''}>
+                    ${gameState.skin === skin.id ? 'Надет' : owned ? 'В коллекции' : 'Купить'}
+                </button>
+            </div>
+        `;
+    }).join('');
     
-    updateUI();
-});
+    document.querySelectorAll('.skin-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const skinId = item.dataset.skin;
+            const price = parseInt(item.dataset.price);
+            
+            if (gameState.ownedSkins.includes(skinId)) {
+                gameState.skin = skinId;
+                document.getElementById('clickBtn').className = `clicker-btn skin-${skinId}`;
+                renderSkins();
+                showNotification('Скин надет!', 'Кнопка изменила цвет', 'success');
+            } else if (gameState.balance >= price) {
+                gameState.balance -= price;
+                gameState.ownedSkins.push(skinId);
+                gameState.skin = skinId;
+                renderSkins();
+                updateUI();
+                showNotification('Скин куплен!', 'Теперь он ваш', 'success');
+            } else {
+                showNotification('Недостаточно!', `Нужно ${price}💰`, 'error');
+            }
+        });
+    });
+}
 
 // ========== УПРАВЛЕНИЕ АВТОКЛИКЕРОМ ==========
-document.getElementById('autoPowerBtn').addEventListener('click', (e) => {
+document.getElementById('autoStartBtn')?.addEventListener('click', (e) => {
     e.stopPropagation();
     
     if (gameState.autoclickers === 0) {
-        showNotification('Ошибка', 'Купите автокликер!', 'error');
+        showNotification('Ошибка', 'Купите автокликер в магазине!', 'error');
         return;
     }
     
     if (gameState.autoClicker.enabled) {
         gameState.autoClicker.enabled = false;
-        gameState.autoClicker.timeLeft = 0;
+        document.getElementById('autoStatus').textContent = '⏸️ Остановлен';
+        document.getElementById('autoStartBtn').textContent = '▶️';
     } else {
         gameState.autoClicker.enabled = true;
-        gameState.autoClicker.timeLeft = 120;
+        gameState.autoClicker.timeLeft = gameState.autoClicker.maxTime;
+        document.getElementById('autoStatus').textContent = '⚡ Работает';
+        document.getElementById('autoStartBtn').textContent = '⏹️';
+        document.getElementById('autoProgress').style.width = '100%';
     }
     
-    updateUI();
+    saveLocalSave();
 });
 
-document.getElementById('autoTurboBtn').addEventListener('click', (e) => {
+document.getElementById('autoUpgradeBtn')?.addEventListener('click', (e) => {
     e.stopPropagation();
     
-    if (gameState.balance >= 100) {
-        gameState.balance -= 100;
-        gameState.turbo.active = true;
-        gameState.turbo.timeLeft = 120;
-        showNotification('Турбо!', 'x2 на 2 минуты', 'success');
-        updateUI();
-    } else {
-        showNotification('Недостаточно', 'Нужно 100💰', 'error');
-    }
-});
-
-// ========== ПОКУПКИ ==========
-window.buyItem = (id, price) => {
+    const price = 100 * gameState.autoClicker.level;
     if (gameState.balance >= price) {
         gameState.balance -= price;
-        
-        switch(id) {
-            case 'autoclicker':
-                gameState.autoclickers++;
-                showNotification('Успешно!', 'Автокликер +1', 'success');
-                break;
-            case 'power':
-                gameState.power++;
-                showNotification('Успешно!', 'Сила +1', 'success');
-                break;
-            case 'booster':
-                gameState.booster.active = true;
-                gameState.booster.timeLeft = 30;
-                showNotification('Бустер!', 'x2 на 30 сек', 'success');
-                break;
-            case 'key':
-                localStorage.setItem('hasKey', 'true');
-                showNotification('Ключ получен!', 'Удача в боксе', 'success');
-                break;
-        }
-        
+        gameState.autoClicker.level++;
+        gameState.autoClicker.maxTime += 30;
+        showNotification('Улучшено!', `Уровень автокликера ${gameState.autoClicker.level}`, 'success');
         updateUI();
+        saveLocalSave();
     } else {
-        showNotification('Недостаточно!', `Нужно ${price - gameState.balance}💰`, 'error');
-    }
-};
-
-// ========== БОКС ==========
-document.getElementById('boxBtn').addEventListener('click', () => {
-    if (gameState.balance >= 100) {
-        gameState.balance -= 100;
-        gameState.boxesOpened++;
-        
-        const hasKey = localStorage.getItem('hasKey') === 'true';
-        let reward;
-        
-        if (hasKey) {
-            reward = 500;
-            localStorage.removeItem('hasKey');
-        } else {
-            const random = Math.random();
-            reward = random < 0.5 ? 50 : random < 0.8 ? 100 : random < 0.95 ? 200 : 500;
-        }
-        
-        gameState.balance += reward;
-        showNotification('Бокс открыт!', `+${reward} монет`, reward >= 500 ? 'warning' : 'success');
-        updateUI();
+        showNotification('Недостаточно средств', `Нужно ${price}💰`, 'error');
     }
 });
 
-// ========== ЕЖЕДНЕВНАЯ НАГРАДА ==========
-document.getElementById('dailyBtn').addEventListener('click', () => {
-    const today = new Date().toDateString();
-    
-    if (gameState.lastDaily !== today) {
-        gameState.balance += 500;
-        gameState.lastDaily = today;
-        gameState.daysActive++;
-        showNotification('Ежедневно!', '+500 монет', 'success');
-        updateUI();
-    }
-});
-
-// ========== ПЕРЕТАСКИВАНИЕ АВТОКЛИКЕРА ==========
-const autoElement = document.getElementById('floatingAuto');
-const dragHandle = document.getElementById('autoDragHandle');
-let isDragging = false;
-
-dragHandle.addEventListener('mousedown', startDrag);
-dragHandle.addEventListener('touchstart', startDrag, { passive: false });
-
-function startDrag(e) {
-    e.preventDefault();
+document.getElementById('autoBoostBtn')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    isDragging = true;
     
-    const startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
-    const startY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
-    const startLeft = autoElement.offsetLeft;
-    const startTop = autoElement.offsetTop;
-    
-    function onDrag(e) {
-        if (!isDragging) return;
-        e.preventDefault();
-        
-        const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
-        const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
-        
-        let newLeft = startLeft + (clientX - startX);
-        let newTop = startTop + (clientY - startY);
-        
-        newLeft = Math.max(0, Math.min(window.innerWidth - autoElement.offsetWidth, newLeft));
-        newTop = Math.max(0, Math.min(window.innerHeight - autoElement.offsetHeight, newTop));
-        
-        autoElement.style.left = newLeft + 'px';
-        autoElement.style.top = newTop + 'px';
-        autoElement.style.right = 'auto';
-        autoElement.style.bottom = 'auto';
+    if (gameState.balance >= 50) {
+        gameState.balance -= 50;
+        gameState.turbo.active = true;
+        gameState.turbo.timeLeft = 30;
+        document.getElementById('autoClicker').classList.add('turbo');
+        showNotification('Турбо!', 'x2 на 30 секунд', 'success');
+        updateUI();
+        saveLocalSave();
+    } else {
+        showNotification('Недостаточно средств', 'Нужно 50💰', 'error');
     }
-    
-    function stopDrag() {
-        isDragging = false;
-        document.removeEventListener('mousemove', onDrag);
-        document.removeEventListener('touchmove', onDrag);
-        document.removeEventListener('mouseup', stopDrag);
-        document.removeEventListener('touchend', stopDrag);
+});
+
+// ========== СОХРАНЕНИЕ ПРИ ВЫХОДЕ ==========
+window.addEventListener('beforeunload', () => {
+    if (gameState.nickname) {
+        saveLocalSave();
     }
-    
-    document.addEventListener('mousemove', onDrag);
-    document.addEventListener('touchmove', onDrag, { passive: false });
-    document.addEventListener('mouseup', stopDrag);
-    document.addEventListener('touchend', stopDrag);
-}
-
-// ========== СОХРАНЕНИЕ ==========
-document.getElementById('saveToFile').addEventListener('click', () => {
-    const dataStr = JSON.stringify(gameState);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${gameState.nickname}_save.click`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification('Сохранено!', 'Игра сохранена в файл', 'success');
 });
 
-// ========== ВЫХОД ==========
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    document.getElementById('gameContainer').style.display = 'none';
-    document.getElementById('authModal').style.display = 'flex';
-    document.getElementById('loginInput').value = '';
-    document.getElementById('loginBtn').disabled = true;
-    gameState.nickname = '';
-});
-
-// ========== БЫСТРЫЙ ПЕРЕХОД К ДРУЗЬЯМ ==========
-document.getElementById('friendsQuickBtn').addEventListener('click', () => {
-    document.querySelector('.menu-item[data-tab="friends"]').click();
-});
+// Инициализируем скины
+setTimeout(() => {
+    renderSkins();
+}, 500);
