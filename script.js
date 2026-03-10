@@ -16,19 +16,6 @@ let gameState = {
     lastDaily: null,
     lastGift: null,
     usedCodes: [],
-    pass: {
-        level: 1,
-        xp: 0,
-        maxXP: 100,
-        season: 1,
-        claimedRewards: [],
-        quests: {
-            daily: [],
-            weekly: [],
-            seasonal: []
-        },
-        lastQuestReset: Date.now()
-    },
     settings: {
         notifications: true,
         vibration: true,
@@ -47,7 +34,7 @@ let gameState = {
         maxTime: 30,
         multiplier: 2
     },
-    version: '6.2'
+    version: '6.3'
 };
 
 // ========== ТАБЛИЦА ЛИДЕРОВ ==========
@@ -89,7 +76,6 @@ function saveLeaderboard() {
                 name: gameState.nickname,
                 score: playerScore,
                 title: gameState.title,
-                passLevel: gameState.pass.level,
                 lastUpdate: Date.now()
             });
         }
@@ -133,7 +119,6 @@ function renderLeaderboard() {
                 <span class="leader-name">
                     ${player.name || 'Игрок'}
                     ${player.title ? `<span class="leader-title">${player.title}</span>` : ''}
-                    ${player.passLevel ? `<span class="leader-title">Ур.${player.passLevel}</span>` : ''}
                 </span>
                 <span class="leader-score">💰 ${formatNumber(score)}</span>
             </div>
@@ -152,13 +137,11 @@ const titles = [
 ];
 
 function checkTitles() {
-    let newTitle = null;
-    
     for (let i = titles.length - 1; i >= 0; i--) {
         if (gameState.totalClicks >= titles[i].clicks) {
             if (!gameState.titles.includes(titles[i].name)) {
                 gameState.titles.push(titles[i].name);
-                newTitle = titles[i].name;
+                showNotif('🏆 Новый титул!', titles[i].name, 'warning');
             }
             if (gameState.title !== titles[i].name) {
                 gameState.title = titles[i].name;
@@ -166,12 +149,7 @@ function checkTitles() {
             break;
         }
     }
-    
-    if (newTitle) {
-        showNotif('🏆 Новый титул!', newTitle, 'warning');
-        renderTitles();
-        saveGame();
-    }
+    renderTitles();
 }
 
 function renderTitles() {
@@ -199,210 +177,6 @@ function renderTitles() {
     `;
 }
 
-// ========== КВЕСТЫ ==========
-const questTemplates = {
-    daily: [
-        { id: 'daily_clicks', name: 'Кликер', desc: 'Сделайте 100 кликов', icon: '👆', target: 100, reward: 50, xp: 10 },
-        { id: 'daily_earn', name: 'Заработок', desc: 'Заработайте 500 монет', icon: '💰', target: 500, reward: 50, xp: 10 },
-        { id: 'daily_case', name: 'Открыватель', desc: 'Откройте 1 кейс', icon: '📦', target: 1, reward: 50, xp: 10 }
-    ],
-    weekly: [
-        { id: 'weekly_clicks', name: 'Чемпион', desc: 'Сделайте 1000 кликов', icon: '👑', target: 1000, reward: 200, xp: 50 },
-        { id: 'weekly_earn', name: 'Богач', desc: 'Заработайте 5000 монет', icon: '💎', target: 5000, reward: 200, xp: 50 }
-    ],
-    seasonal: [
-        { id: 'season_clicks', name: 'Легенда', desc: 'Сделайте 10000 кликов', icon: '🏆', target: 10000, reward: 1000, xp: 200 }
-    ]
-};
-
-function initQuests() {
-    const now = Date.now();
-    const dayInMs = 24 * 60 * 60 * 1000;
-    
-    if (now - gameState.pass.lastQuestReset > dayInMs) {
-        gameState.pass.quests.daily = generateQuests('daily');
-        gameState.pass.lastQuestReset = now;
-    }
-    
-    if (gameState.pass.quests.daily.length === 0) {
-        gameState.pass.quests.daily = generateQuests('daily');
-    }
-    if (gameState.pass.quests.weekly.length === 0) {
-        gameState.pass.quests.weekly = generateQuests('weekly');
-    }
-    if (gameState.pass.quests.seasonal.length === 0) {
-        gameState.pass.quests.seasonal = generateQuests('seasonal');
-    }
-}
-
-function generateQuests(type) {
-    const templates = questTemplates[type];
-    return templates.map(t => ({
-        ...t,
-        progress: 0,
-        completed: false,
-        claimed: false
-    }));
-}
-
-function updateQuestProgress(progressType, value = 1) {
-    let updated = false;
-    
-    ['daily', 'weekly', 'seasonal'].forEach(type => {
-        gameState.pass.quests[type].forEach(quest => {
-            if (quest.completed || quest.claimed) return;
-            
-            if (progressType === 'clicks' && quest.id.includes('clicks')) {
-                quest.progress = Math.min(quest.progress + value, quest.target);
-            }
-            if (progressType === 'earn' && quest.id.includes('earn')) {
-                quest.progress = Math.min(quest.progress + value, quest.target);
-            }
-            if (progressType === 'case' && quest.id.includes('case')) {
-                quest.progress = Math.min(quest.progress + value, quest.target);
-            }
-            
-            if (quest.progress >= quest.target && !quest.completed) {
-                quest.completed = true;
-                showNotif('✅ Квест выполнен!', quest.name, 'success');
-                updated = true;
-            }
-        });
-    });
-    
-    if (updated) {
-        renderQuests('daily');
-        saveGame();
-    }
-}
-
-function claimQuestReward(type, questId) {
-    const quest = gameState.pass.quests[type].find(q => q.id === questId);
-    if (!quest || !quest.completed || quest.claimed) return;
-    
-    gameState.balance += quest.reward;
-    gameState.pass.xp += quest.xp;
-    
-    while (gameState.pass.xp >= gameState.pass.maxXP) {
-        gameState.pass.xp -= gameState.pass.maxXP;
-        gameState.pass.level++;
-        gameState.pass.maxXP = Math.floor(gameState.pass.maxXP * 1.2);
-        showNotif('⬆️ Уровень пасса повышен!', `Уровень ${gameState.pass.level}`, 'warning');
-        
-        if (gameState.pass.level <= 10) {
-            grantPassReward(gameState.pass.level);
-        }
-    }
-    
-    quest.claimed = true;
-    showNotif('🎁 Награда получена!', `+${quest.reward}💰, +${quest.xp} XP`, 'success');
-    
-    renderQuests(type);
-    updatePassUI();
-    saveGame();
-}
-
-function grantPassReward(level) {
-    switch(level) {
-        case 1: gameState.balance += 100; break;
-        case 2: gameState.turbo.active = true; gameState.turbo.timeLeft = gameState.turbo.maxTime; break;
-        case 3: if (!gameState.ownedSkins.includes('gold')) gameState.ownedSkins.push('gold'); break;
-        case 4: gameState.balance += 500; break;
-        case 5: gameState.autoclickers++; break;
-        case 6: gameState.balance += 1000; break;
-        case 7: gameState.turbo.active = true; gameState.turbo.timeLeft = gameState.turbo.maxTime * 2; break;
-        case 8: localStorage.setItem('hasKey', 'true'); break;
-        case 9: gameState.balance += 2000; break;
-        case 10: 
-            if (!gameState.titles.includes('🎫 Мастер пасса')) {
-                gameState.titles.push('🎫 Мастер пасса');
-                gameState.title = '🎫 Мастер пасса';
-            }
-            break;
-    }
-}
-
-function renderQuests(type = 'daily') {
-    const container = document.getElementById('questsContainer');
-    if (!container) return;
-    
-    const quests = gameState.pass.quests[type];
-    if (!quests || quests.length === 0) return;
-    
-    container.innerHTML = quests.map(quest => {
-        const progressPercent = (quest.progress / quest.target) * 100;
-        const isCompleted = quest.completed;
-        const isClaimed = quest.claimed;
-        
-        let buttonText = 'Получить';
-        let buttonDisabled = !isCompleted || isClaimed;
-        
-        if (isClaimed) buttonText = '✓ Получено';
-        else if (!isCompleted) buttonText = 'В процессе';
-        
-        return `
-            <div class="quest-card ${isCompleted ? 'completed' : ''}">
-                <div class="quest-header">
-                    <span class="quest-name">
-                        <span class="quest-icon">${quest.icon}</span>
-                        ${quest.name}
-                    </span>
-                    <span class="quest-reward">+${quest.reward}💰 ${quest.xp}XP</span>
-                </div>
-                <div class="quest-desc">${quest.desc}</div>
-                <div class="quest-progress">
-                    <div class="quest-progress-fill" style="width: ${progressPercent}%"></div>
-                </div>
-                <div class="quest-stats">
-                    <span>${quest.progress}/${quest.target}</span>
-                    <span>${Math.round(progressPercent)}%</span>
-                </div>
-                <button class="quest-claim-btn ${isClaimed ? 'claimed' : ''}" 
-                        onclick="claimQuestReward('${type}', '${quest.id}')"
-                        ${buttonDisabled ? 'disabled' : ''}>
-                    ${buttonText}
-                </button>
-            </div>
-        `;
-    }).join('');
-}
-
-function updatePassUI() {
-    document.getElementById('passLevel').textContent = gameState.pass.level;
-    document.getElementById('passXP').textContent = gameState.pass.xp;
-    document.getElementById('passMaxXP').textContent = gameState.pass.maxXP;
-    
-    const progressPercent = (gameState.pass.xp / gameState.pass.maxXP) * 100;
-    document.getElementById('passProgress').style.width = progressPercent + '%';
-    
-    const rewardsGrid = document.getElementById('passRewards');
-    if (rewardsGrid) {
-        const passRewards = [
-            { level: 1, icon: '💰', name: '100 монет' },
-            { level: 2, icon: '⚡', name: 'Турбо' },
-            { level: 3, icon: '🎨', name: 'Золотой скин' },
-            { level: 4, icon: '💰', name: '500 монет' },
-            { level: 5, icon: '🤖', name: 'Автокликер' },
-            { level: 6, icon: '💰', name: '1000 монет' },
-            { level: 7, icon: '⚡', name: 'Турбо x2' },
-            { level: 8, icon: '🔑', name: 'Ключ' },
-            { level: 9, icon: '💰', name: '2000 монет' },
-            { level: 10, icon: '👑', name: 'Мастер пасса' }
-        ];
-        
-        rewardsGrid.innerHTML = passRewards.map(r => {
-            const isCurrent = r.level === gameState.pass.level;
-            return `
-                <div class="reward-item ${isCurrent ? 'current' : ''}">
-                    <div class="reward-level">Ур.${r.level}</div>
-                    <div class="reward-icon">${r.icon}</div>
-                    <div class="reward-name">${r.name}</div>
-                </div>
-            `;
-        }).join('');
-    }
-}
-
 // ========== ФОРМАТИРОВАНИЕ ЧИСЕЛ ==========
 function formatNumber(num) {
     if (isNaN(num) || num === null || num === undefined) return '0';
@@ -427,7 +201,6 @@ function loadGame() {
         if (saved) {
             const data = JSON.parse(saved);
             gameState = { ...gameState, ...data };
-            initQuests();
             return true;
         }
     } catch (e) {
@@ -460,7 +233,6 @@ function loadClickFile() {
             try {
                 const data = JSON.parse(event.target.result);
                 gameState = { ...gameState, ...data };
-                initQuests();
                 
                 document.getElementById('playerName').textContent = gameState.nickname || 'Игрок';
                 document.getElementById('profileName').textContent = gameState.nickname || 'Игрок';
@@ -472,8 +244,6 @@ function loadClickFile() {
                 renderSkins();
                 renderCases();
                 renderTitles();
-                renderQuests('daily');
-                updatePassUI();
                 saveLeaderboard();
                 
                 showNotif('✅ Успешно', 'Игра загружена');
@@ -493,6 +263,8 @@ function loadClickFile() {
 
 // ========== УВЕДОМЛЕНИЯ ==========
 function showNotif(title, msg, type = 'success') {
+    if (!gameState.settings.notifications && type !== 'error') return;
+    
     const box = document.getElementById('notifications');
     if (!box) return;
     
@@ -505,6 +277,10 @@ function showNotif(title, msg, type = 'success') {
         n.style.animation = 'notificationSlide 0.3s reverse';
         setTimeout(() => n.remove(), 300);
     }, 3000);
+    
+    if (gameState.settings.vibration && type === 'success') {
+        navigator.vibrate?.(50);
+    }
 }
 
 // ========== ТУРБО РЕЖИМ ==========
@@ -583,8 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCases();
     renderPromoList();
     renderTitles();
-    renderQuests('daily');
-    updatePassUI();
     updateTurboUI();
     startLoop();
 });
@@ -604,7 +378,6 @@ function initEvents() {
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
         
-        initQuests();
         saveGame();
         saveLeaderboard();
         showNotif('✅ Добро пожаловать!', `Привет, ${name}!`);
@@ -652,18 +425,6 @@ function initEvents() {
             
             if (tab === 'leaders') renderLeaderboard();
             else if (tab === 'profile') renderTitles();
-            else if (tab === 'pass') {
-                renderQuests('daily');
-                updatePassUI();
-            }
-        });
-    });
-    
-    document.querySelectorAll('.pass-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.pass-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            renderQuests(tab.dataset.pass);
         });
     });
     
@@ -688,8 +449,6 @@ function initEvents() {
         setTimeout(() => btn.style.transform = '', 100);
         
         checkTitles();
-        updateQuestProgress('clicks', 1);
-        updateQuestProgress('earn', gain);
         
         updateUI();
     });
@@ -935,7 +694,6 @@ window.buyItem = (type) => {
         gameState.balance -= 50;
         gameState.autoclickers++;
         showNotif('✅ Куплено!', `Автокликер +${gameState.autoclickers}`);
-        updateQuestProgress('auto', 1);
     } else if (type === 'power' && gameState.balance >= 100) {
         gameState.balance -= 100;
         gameState.power++;
@@ -962,8 +720,7 @@ function renderSkins() {
     const skins = [
         { id: 'red', name: 'Красный', price: 200 },
         { id: 'blue', name: 'Синий', price: 200 },
-        { id: 'green', name: 'Зеленый', price: 200 },
-        { id: 'gold', name: 'Золотой', price: 500 }
+        { id: 'green', name: 'Зеленый', price: 200 }
     ];
     
     grid.innerHTML = skins.map(s => {
@@ -1079,7 +836,6 @@ window.openCase = (type) => {
         document.getElementById('caseResult').innerHTML = `+${formatNumber(reward)}💰`;
         document.getElementById('caseText').textContent = 'Вы выиграли!';
         
-        updateQuestProgress('case', 1);
         checkTitles();
         
         updateUI();
@@ -1185,8 +941,6 @@ function startLoop() {
             gameState.balance += gain;
             gameState.totalEarned += gain;
             
-            updateQuestProgress('earn', gain);
-            
             if (gameState.autoClicker.timeLeft <= 0) {
                 gameState.autoClicker.enabled = false;
             }
@@ -1229,6 +983,5 @@ function updateUI() {
 }
 
 // ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ==========
-window.claimQuestReward = claimQuestReward;
 window.buyItem = buyItem;
 window.openCase = openCase;
