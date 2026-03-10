@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CLICKER 4.9</title>
+    <title>CLICKER 5.1</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
@@ -104,6 +104,11 @@
             </button>
         </div>
 
+        <!-- Индикатор турбо режима (плавает над кликером) -->
+        <div class="turbo-indicator" id="turboIndicator" style="display: none;">
+            <span>⚡ ТУРБО ⚡</span>
+        </div>
+
         <!-- Контент -->
         <div class="content" id="content">
             <!-- Профиль -->
@@ -179,11 +184,15 @@
                         <span>Автосохранение</span>
                         <input type="checkbox" id="autosaveCheck" checked>
                     </label>
+                    <label class="switch">
+                        <span>Звуки</span>
+                        <input type="checkbox" id="soundsCheck" checked>
+                    </label>
                 </div>
             </div>
         </div>
 
-        <!-- МЕНЮ АВТОКЛИКЕРА -->
+        <!-- МЕНЮ АВТОКЛИКЕРА С ТУРБО -->
         <div class="auto-menu" id="autoMenu">
             <div class="auto-menu-header">
                 <span>🤖 Автокликер</span>
@@ -213,6 +222,18 @@
                     </div>
                 </div>
 
+                <!-- НОВЫЙ БЛОК ТУРБО -->
+                <div class="turbo-section" id="turboSection">
+                    <div class="turbo-status" id="turboStatus">
+                        <span class="turbo-icon">⚡</span>
+                        <span class="turbo-text">Турбо режим выключен</span>
+                    </div>
+                    <div class="turbo-timer" id="turboTimer">0:00</div>
+                    <div class="turbo-bar">
+                        <div class="turbo-progress" id="turboProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+
                 <div class="auto-menu-controls">
                     <button class="auto-menu-btn big" id="autoMenuStart">
                         <span>▶️</span>
@@ -223,10 +244,10 @@
                         <span>Улучшить</span>
                         <span class="price" id="upgradePrice">100💰</span>
                     </button>
-                    <button class="auto-menu-btn" id="autoMenuBoost">
+                    <button class="auto-menu-btn turbo-btn" id="autoMenuTurbo">
                         <span>⚡</span>
-                        <span>Турбо</span>
-                        <span class="price">50💰</span>
+                        <span>Турбо (x2)</span>
+                        <span class="price" id="turboPrice">50💰</span>
                     </button>
                 </div>
 
@@ -234,6 +255,7 @@
                     <p>⚡ Автокликер работает 2 минуты</p>
                     <p>📈 Доход: уровень × силу</p>
                     <p>⬆️ Улучшение: +30 сек, +1 уровень</p>
+                    <p class="turbo-info">🔥 ТУРБО: x2 ко всем доходам на 30 секунд</p>
                 </div>
             </div>
         </div>
