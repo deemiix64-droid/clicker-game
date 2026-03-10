@@ -17,18 +17,25 @@ let gameState = {
     settings: {
         notifications: true,
         vibration: true,
-        autoSave: true
+        autoSave: true,
+        sounds: true
     },
     autoClicker: {
         enabled: false,
         timeLeft: 0,
-        maxTime: 120,
+        maxTime: 120, // 2 минуты
         level: 1
     },
-    version: '4.9'
+    turbo: {
+        active: false,
+        timeLeft: 0,
+        maxTime: 30,
+        multiplier: 2
+    },
+    version: '5.1'
 };
 
-// ========== ТАБЛИЦА ЛИДЕРОВ ==========
+// ========== ТАБЛИЦА ЛИДЕРОВ (ТОЛЬКО РЕАЛЬНЫЕ ИГРОКИ) ==========
 let leaderboardDB = [];
 
 // Загрузка лидеров
@@ -37,13 +44,25 @@ function loadLeaderboard() {
     if (saved) {
         try {
             leaderboardDB = JSON.parse(saved);
-            // Фильтруем только реальных игроков
+            // Фильтруем ТОЛЬКО реальных игроков (с валидными никами)
             leaderboardDB = leaderboardDB.filter(player => 
                 player.name && 
+                player.name.length >= 3 && 
                 player.name !== 'Бот' && 
+                player.name !== 'Тест' &&
                 player.name !== 'Игрок' &&
-                player.name.length >= 3
+                !player.name.includes('бот') &&
+                !player.name.includes('test')
             );
+            
+            // Удаляем дубликаты по нику
+            const uniqueNames = new Set();
+            leaderboardDB = leaderboardDB.filter(player => {
+                if (uniqueNames.has(player.name)) return false;
+                uniqueNames.add(player.name);
+                return true;
+            });
+            
         } catch (e) {
             leaderboardDB = [];
         }
@@ -63,24 +82,21 @@ function loadLeaderboard() {
 // Сохранение лидеров
 function saveLeaderboard() {
     try {
+        // Добавляем текущего игрока только если он реален
         if (gameState.nickname && gameState.nickname.length >= 3) {
             const playerScore = isNaN(gameState.balance) ? 0 : Math.floor(gameState.balance);
             
-            const existingIndex = leaderboardDB.findIndex(p => p.name === gameState.nickname);
+            // Удаляем все записи с таким ником (чтобы не было дубликатов)
+            leaderboardDB = leaderboardDB.filter(p => p.name !== gameState.nickname);
             
-            if (existingIndex >= 0) {
-                leaderboardDB[existingIndex].score = playerScore;
-                leaderboardDB[existingIndex].lastUpdate = Date.now();
-            } else {
-                leaderboardDB.push({
-                    name: gameState.nickname,
-                    score: playerScore,
-                    joined: Date.now(),
-                    lastUpdate: Date.now()
-                });
-            }
+            // Добавляем актуальную запись
+            leaderboardDB.push({
+                name: gameState.nickname,
+                score: playerScore,
+                lastUpdate: Date.now()
+            });
             
-            // Удаляем игроков с NaN или отрицательным score
+            // Финальная фильтрация
             leaderboardDB = leaderboardDB.filter(p => 
                 p.name && 
                 p.name.length >= 3 && 
@@ -115,7 +131,7 @@ function renderLeaderboard() {
                 <span class="leader-name">Пока нет игроков</span>
             </div>
             <div class="leader-row">
-                <span class="leader-name">Будьте первым!</span>
+                <span class="leader-name">Войдите и станьте первым!</span>
             </div>
         `;
         return;
@@ -218,6 +234,7 @@ function loadClickFile() {
                 document.getElementById('gameContainer').style.display = 'block';
                 
                 updateUI();
+                updateTurboUI();
                 renderShop();
                 renderSkins();
                 saveLeaderboard();
@@ -235,6 +252,113 @@ function loadClickFile() {
     };
     
     input.click();
+}
+
+// ========== ЗВУКИ ==========
+function playSound(type) {
+    if (!gameState.settings.sounds) return;
+    
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        switch(type) {
+            case 'click':
+                oscillator.frequency.value = 800;
+                gainNode.gain.value = 0.1;
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.1);
+                break;
+            case 'turbo':
+                oscillator.frequency.value = 1200;
+                gainNode.gain.value = 0.2;
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.3);
+                break;
+            case 'upgrade':
+                oscillator.frequency.value = 600;
+                gainNode.gain.value = 0.15;
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.2);
+                break;
+            case 'case':
+                oscillator.frequency.value = 400;
+                gainNode.gain.value = 0.2;
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.4);
+                break;
+        }
+    } catch (e) {
+        // Игнорируем ошибки звука
+    }
+}
+
+// ========== ТУРБО РЕЖИМ ==========
+function activateTurbo() {
+    const turboPrice = 50;
+    
+    if (gameState.balance < turboPrice) {
+        showNotif('❌ Недостаточно', `Нужно ${turboPrice}💰`, 'error');
+        return false;
+    }
+    
+    gameState.balance -= turboPrice;
+    gameState.turbo.active = true;
+    gameState.turbo.timeLeft = gameState.turbo.maxTime;
+    
+    playSound('turbo');
+    
+    const indicator = document.getElementById('turboIndicator');
+    indicator.style.display = 'block';
+    indicator.classList.add('turbo-activate');
+    setTimeout(() => indicator.classList.remove('turbo-activate'), 500);
+    
+    document.getElementById('clickBtn').classList.add('turbo-active');
+    
+    showNotif('⚡ ТУРБО АКТИВИРОВАН!', 'x2 на 30 секунд', 'warning');
+    
+    updateUI();
+    updateTurboUI();
+    saveGame();
+    return true;
+}
+
+function updateTurboUI() {
+    const turboSection = document.getElementById('turboSection');
+    const turboStatus = document.getElementById('turboStatus');
+    const turboTimer = document.getElementById('turboTimer');
+    const turboProgress = document.getElementById('turboProgress');
+    const turboIndicator = document.getElementById('turboIndicator');
+    const clicker = document.getElementById('clickBtn');
+    
+    if (gameState.turbo.active && gameState.turbo.timeLeft > 0) {
+        turboStatus.innerHTML = `
+            <span class="turbo-icon">⚡</span>
+            <span class="turbo-text">Турбо режим АКТИВЕН (x2)</span>
+        `;
+        
+        const seconds = gameState.turbo.timeLeft;
+        turboTimer.textContent = `0:${seconds.toString().padStart(2, '0')}`;
+        
+        const progress = (seconds / gameState.turbo.maxTime) * 100;
+        turboProgress.style.width = progress + '%';
+        
+        turboIndicator.style.display = 'block';
+        clicker.classList.add('turbo-active');
+    } else {
+        turboStatus.innerHTML = `
+            <span class="turbo-icon">⚡</span>
+            <span class="turbo-text">Турбо режим выключен</span>
+        `;
+        turboTimer.textContent = '0:00';
+        turboProgress.style.width = '0%';
+        turboIndicator.style.display = 'none';
+        clicker.classList.remove('turbo-active');
+    }
 }
 
 // ========== ЗАПУСК ==========
@@ -259,6 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCases();
     renderPromoList();
     
+    updateTurboUI();
     startLoop();
 });
 
@@ -277,7 +402,14 @@ function initEvents() {
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
         
-        leaderboardDB = leaderboardDB.filter(p => p.name && p.name.length >= 3);
+        // При входе чистим лидеров от ботов
+        leaderboardDB = leaderboardDB.filter(p => 
+            p.name && 
+            p.name.length >= 3 && 
+            p.name !== 'Бот' && 
+            p.name !== 'Тест' &&
+            !p.name.includes('бот')
+        );
         
         saveGame();
         saveLeaderboard();
@@ -337,7 +469,8 @@ function initEvents() {
     });
     
     document.getElementById('clickBtn').addEventListener('click', () => {
-        const gain = isNaN(gameState.power) ? 1 : gameState.power;
+        const multiplier = gameState.turbo.active ? gameState.turbo.multiplier : 1;
+        const gain = (isNaN(gameState.power) ? 1 : gameState.power) * multiplier;
         
         gameState.balance = (isNaN(gameState.balance) ? 0 : gameState.balance) + gain;
         gameState.totalClicks = (isNaN(gameState.totalClicks) ? 0 : gameState.totalClicks) + 1;
@@ -347,6 +480,7 @@ function initEvents() {
         btn.style.transform = 'scale(0.9)';
         setTimeout(() => btn.style.transform = '', 100);
         
+        playSound('click');
         updateUI();
     });
     
@@ -446,6 +580,12 @@ function initEvents() {
                 msg = 'Сила +1';
                 success = true;
                 break;
+            case 'TURBO':
+                if (activateTurbo()) {
+                    msg = 'Турбо активирован!';
+                    success = true;
+                }
+                break;
             default:
                 showNotif('❌ Неверный код', '', 'error');
                 return;
@@ -473,6 +613,10 @@ function initEvents() {
         gameState.settings.autoSave = e.target.checked;
     });
     
+    document.getElementById('soundsCheck').addEventListener('change', (e) => {
+        gameState.settings.sounds = e.target.checked;
+    });
+    
     document.getElementById('autoMenuStart').addEventListener('click', () => {
         if (gameState.autoclickers === 0 || isNaN(gameState.autoclickers)) {
             showNotif('❌ Ошибка', 'Купите автокликер', 'error');
@@ -480,10 +624,16 @@ function initEvents() {
         }
         
         if (gameState.autoClicker.enabled) {
+            // Останавливаем
             gameState.autoClicker.enabled = false;
+            gameState.autoClicker.timeLeft = 0;
+            showNotif('⏸️ Автокликер остановлен', '', 'info');
         } else {
+            // Запускаем на maxTime секунд
             gameState.autoClicker.enabled = true;
-            gameState.autoClicker.timeLeft = gameState.autoClicker.maxTime || 120;
+            gameState.autoClicker.timeLeft = gameState.autoClicker.maxTime;
+            playSound('upgrade');
+            showNotif('▶️ Автокликер запущен', `Будет работать ${gameState.autoClicker.maxTime} секунд`, 'success');
         }
         
         updateAutoMenu();
@@ -498,7 +648,8 @@ function initEvents() {
             gameState.balance -= price;
             gameState.autoClicker.level = level + 1;
             gameState.autoClicker.maxTime = (gameState.autoClicker.maxTime || 120) + 30;
-            showNotif('⬆️ Улучшено!', `Уровень ${gameState.autoClicker.level}`);
+            playSound('upgrade');
+            showNotif('⬆️ Улучшено!', `Уровень ${gameState.autoClicker.level}, время +30 сек`, 'success');
             updateUI();
             updateAutoMenu();
             saveGame();
@@ -508,8 +659,9 @@ function initEvents() {
         }
     });
     
-    document.getElementById('autoMenuBoost').addEventListener('click', () => {
-        showNotif('⚡ Турбо', 'Скоро будет доступно', 'info');
+    document.getElementById('autoMenuTurbo').addEventListener('click', () => {
+        activateTurbo();
+        updateTurboUI();
     });
 }
 
@@ -531,19 +683,22 @@ function updateAutoMenu() {
     
     if (gameState.autoClicker.enabled) {
         const timeLeft = isNaN(gameState.autoClicker.timeLeft) ? 0 : gameState.autoClicker.timeLeft;
-        const m = Math.floor(timeLeft / 60);
-        const s = timeLeft % 60;
-        document.getElementById('autoMenuTimer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        document.getElementById('autoMenuTimer').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
         const maxTime = isNaN(gameState.autoClicker.maxTime) ? 120 : gameState.autoClicker.maxTime;
-        const progress = maxTime > 0 ? (timeLeft / maxTime) * 100 : 0;
-        document.getElementById('autoMenuProgress').style.width = Math.max(0, Math.min(100, progress)) + '%';
+        const progress = maxTime > 0 ? ((maxTime - timeLeft) / maxTime) * 100 : 0;
+        document.getElementById('autoMenuProgress').style.width = progress + '%';
     } else {
         const maxTime = isNaN(gameState.autoClicker.maxTime) ? 120 : gameState.autoClicker.maxTime;
-        const m = Math.floor(maxTime / 60);
-        const s = maxTime % 60;
-        document.getElementById('autoMenuTimer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
-        document.getElementById('autoMenuProgress').style.width = '100%';
+        const minutes = Math.floor(maxTime / 60);
+        const seconds = maxTime % 60;
+        document.getElementById('autoMenuTimer').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        document.getElementById('autoMenuProgress').style.width = '0%';
     }
+    
+    updateTurboUI();
 }
 
 // ========== УВЕДОМЛЕНИЯ ==========
@@ -584,6 +739,12 @@ function renderShop() {
             <span>+1 к силе</span>
             <button onclick="buyItem('power')">100💰</button>
         </div>
+        <div class="shop-item">
+            <span>⚡</span>
+            <span>Турбо</span>
+            <span>x2 на 30 сек</span>
+            <button onclick="buyItem('turbo')">50💰</button>
+        </div>
     `;
 }
 
@@ -594,10 +755,17 @@ window.buyItem = (type) => {
         gameState.balance = balance - 50;
         gameState.autoclickers = (isNaN(gameState.autoclickers) ? 0 : gameState.autoclickers) + 1;
         showNotif('✅ Куплено!', `Автокликер +${gameState.autoclickers}`);
+        playSound('upgrade');
     } else if (type === 'power' && balance >= 100) {
         gameState.balance = balance - 100;
         gameState.power = (isNaN(gameState.power) ? 1 : gameState.power) + 1;
         showNotif('✅ Куплено!', `Сила +${gameState.power}`);
+        playSound('upgrade');
+    } else if (type === 'turbo' && balance >= 50) {
+        gameState.balance = balance - 50;
+        if (activateTurbo()) {
+            updateTurboUI();
+        }
     } else {
         showNotif('❌ Недостаточно', '', 'error');
         return;
@@ -649,6 +817,7 @@ function renderSkins() {
                 renderSkins();
                 updateUI();
                 showNotif('✅ Скин куплен!');
+                playSound('upgrade');
                 saveGame();
                 saveLeaderboard();
             } else {
@@ -728,6 +897,7 @@ window.openCase = (type) => {
         
         document.getElementById('caseResult').innerHTML = `+${formatNumber(reward)}💰`;
         document.getElementById('caseText').textContent = 'Вы выиграли!';
+        playSound('case');
         
         updateUI();
         saveGame();
@@ -766,6 +936,7 @@ function renderPromoList() {
         <div class="promo-item"><span>START</span><span>+100💰</span></div>
         <div class="promo-item"><span>GIFT</span><span>+300💰</span></div>
         <div class="promo-item"><span>POWER</span><span>Сила +1</span></div>
+        <div class="promo-item"><span>TURBO</span><span>Бесплатный турбо</span></div>
     `;
 }
 
@@ -800,21 +971,35 @@ function startLoop() {
     setInterval(() => {
         if (!gameState.nickname) return;
         
+        // Обновление турбо
+        if (gameState.turbo.active && gameState.turbo.timeLeft > 0) {
+            gameState.turbo.timeLeft--;
+            
+            if (gameState.turbo.timeLeft <= 0) {
+                gameState.turbo.active = false;
+                showNotif('⚡ Турбо закончился', 'Режим x2 отключен', 'info');
+                updateTurboUI();
+            }
+        }
+        
+        // Автокликер
         if (gameState.autoClicker.enabled && gameState.autoClicker.timeLeft > 0) {
             gameState.autoClicker.timeLeft--;
             
             const count = isNaN(gameState.autoclickers) ? 0 : gameState.autoclickers;
             const level = isNaN(gameState.autoClicker.level) ? 1 : gameState.autoClicker.level;
             const power = isNaN(gameState.power) ? 1 : gameState.power;
+            const multiplier = gameState.turbo.active ? gameState.turbo.multiplier : 1;
             
             if (count > 0) {
-                const inc = level * power;
+                const inc = level * power * multiplier;
                 gameState.balance = (isNaN(gameState.balance) ? 0 : gameState.balance) + inc;
                 gameState.totalEarned = (isNaN(gameState.totalEarned) ? 0 : gameState.totalEarned) + inc;
             }
             
             if (gameState.autoClicker.timeLeft <= 0) {
                 gameState.autoClicker.enabled = false;
+                showNotif('⏸️ Автокликер остановлен', 'Время вышло', 'info');
             }
             
             updateAutoMenu();
@@ -827,6 +1012,7 @@ function startLoop() {
         if (gameState.autoClicker.enabled) {
             updateAutoMenu();
         }
+        updateTurboUI();
     }, 500);
     
     setInterval(updateGiftTimer, 60000);
@@ -848,6 +1034,7 @@ function updateUI() {
     document.getElementById('profileLevel').textContent = `Уровень ${lvl}`;
     
     updateGiftTimer();
+    updateTurboUI();
     
     if (gameState.settings.autoSave && gameState.nickname) {
         saveGame();
