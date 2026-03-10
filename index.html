@@ -2,243 +2,209 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>CLICKER 3.3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CLICKER 3.7</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
-    <div class="game-wrapper">
-        <!-- Окно ника -->
-        <div class="nickname-modal" id="nicknameModal">
-            <div class="modal-content">
-                <h2>👋 Добро пожаловать!</h2>
-                <p>Введите ваш никнейм:</p>
-                <input type="text" id="nicknameInput" placeholder="Игрок" maxlength="20" value="Игрок">
-                <div class="modal-buttons">
-                    <button id="startNewGame">Новая игра</button>
-                    <button id="loadGameFile" class="load-btn">Загрузить .click</button>
-                </div>
+    <!-- Модальное окно входа -->
+    <div class="modal-overlay" id="authModal">
+        <div class="modal-content">
+            <h2>🔐 Вход в игру</h2>
+            <div class="input-wrapper">
+                <input type="text" id="loginInput" placeholder="Ваш ник" maxlength="20" autocomplete="off">
+                <span class="input-hint" id="nicknameHint">🔍 Проверка...</span>
             </div>
-        </div>
-
-        <!-- Основной контейнер игры -->
-        <div class="game-container" id="gameContainer" style="display: none;">
-            <!-- Шапка с профилем и темами -->
-            <div class="profile-header">
-                <div class="player-info">
-                    <div class="player-avatar">👤</div>
-                    <div class="player-details">
-                        <span class="player-name" id="playerName">Игрок</span>
-                        <span class="player-level" id="playerLevel">Уровень 1</span>
-                    </div>
-                </div>
-                
-                <!-- Переключатель тем -->
-                <div class="theme-switcher">
-                    <button class="theme-btn" data-theme="dark" title="Темная">🌙</button>
-                    <button class="theme-btn" data-theme="light" title="Светлая">☀️</button>
-                    <button class="theme-btn" data-theme="neon" title="Неоновая">🌈</button>
-                    <button class="theme-btn" data-theme="forest" title="Лесная">🌲</button>
-                </div>
-                
-                <div class="stats-panel">
-                    <div class="stat-item">
-                        <span class="stat-label">💰 Баланс</span>
-                        <span class="stat-value" id="balance">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">⚡ Сила</span>
-                        <span class="stat-value" id="power">1</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">📈 В секунду</span>
-                        <span class="stat-value" id="cps">0</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Центральная часть с кликером -->
-            <div class="clicker-area">
-                <button class="mega-click-btn" id="clickBtn">
-                    <span class="click-emoji">👆</span>
-                    <span class="click-text">КЛИК</span>
-                </button>
-            </div>
-
-            <!-- Плавающий автокликер (перемещаемый) -->
-            <div class="floating-auto" id="floatingAuto">
-                <div class="auto-icon">🤖</div>
-                <div class="auto-status" id="autoStatus">⏸️</div>
-                <div class="auto-timer" id="autoTimer">+0/сек</div>
-                <div class="auto-badge" id="autoCount">0</div>
-                <div class="auto-controls">
-                    <button class="auto-power" id="autoPowerBtn" title="Включить на 2 минуты">▶️</button>
-                    <button class="auto-toggle" id="autoToggleBtn" title="Вкл/Выкл">⏯️</button>
-                </div>
-                <div class="auto-drag-handle" id="autoDragHandle">⋮⋮</div>
-            </div>
-
-            <!-- Блок быстрых действий -->
-            <div class="quick-actions">
-                <button class="action-btn daily" id="dailyBtn">
-                    <span class="action-icon">📅</span>
-                    <span class="action-text">Ежедневно</span>
-                </button>
-                <button class="action-btn box" id="boxBtn">
-                    <span class="action-icon">📦</span>
-                    <span class="action-text">Бокс (100)</span>
-                </button>
-                <button class="action-btn profile-tab" data-tab="profile">
-                    <span class="action-icon">👤</span>
-                    <span class="action-text">Профиль</span>
-                </button>
-            </div>
-
-            <!-- Навигационные табы -->
-            <div class="nav-tabs">
-                <button class="nav-tab active" data-tab="shop">🏪 Магазин</button>
-                <button class="nav-tab" data-tab="skins">🎨 Скины</button>
-                <button class="nav-tab" data-tab="codes">🔑 Промокоды</button>
-                <button class="nav-tab" data-tab="leaders">🏆 Лидеры</button>
-            </div>
-
-            <!-- Профиль -->
-            <div id="profile" class="tab-content">
-                <div class="profile-card">
-                    <h3>📊 Статистика игрока</h3>
-                    <div class="profile-stats">
-                        <div class="profile-stat"><span>Всего кликов:</span><span id="totalClicks">0</span></div>
-                        <div class="profile-stat"><span>Заработано всего:</span><span id="totalEarned">0</span></div>
-                        <div class="profile-stat"><span>Открыто боксов:</span><span id="boxesOpened">0</span></div>
-                        <div class="profile-stat"><span>Дней заходил:</span><span id="daysActive">0</span></div>
-                    </div>
-                    <div class="save-buttons">
-                        <button class="save-btn" id="saveToFile">💾 Сохранить (.click)</button>
-                        <button class="load-btn" id="loadFromFile">📂 Загрузить (.click)</button>
-                    </div>
-                    <button class="change-nick-btn" id="changeNickBtn">✏️ Сменить ник</button>
-                </div>
-            </div>
-
-            <!-- Магазин -->
-            <div id="shop" class="tab-content active">
-                <h3>🏪 Магазин</h3>
-                <div class="shop-grid">
-                    <div class="shop-card">
-                        <div class="shop-icon">🤖</div>
-                        <div class="shop-info">
-                            <div class="shop-title">Автокликер</div>
-                            <div class="shop-desc">+1 клик/сек (постоянно)</div>
-                        </div>
-                        <button class="shop-buy" data-item="autoclicker" data-price="50">50💰</button>
-                    </div>
-                    <div class="shop-card">
-                        <div class="shop-icon">⏱️</div>
-                        <div class="shop-info">
-                            <div class="shop-title">Турбо режим</div>
-                            <div class="shop-desc">x2 на 2 минуты</div>
-                        </div>
-                        <button class="shop-buy" data-item="turbo" data-price="100">100💰</button>
-                    </div>
-                    <div class="shop-card">
-                        <div class="shop-icon">💪</div>
-                        <div class="shop-info">
-                            <div class="shop-title">Сила клика</div>
-                            <div class="shop-desc">+1 к силе</div>
-                        </div>
-                        <button class="shop-buy" data-item="power" data-price="100">100💰</button>
-                    </div>
-                    <div class="shop-card">
-                        <div class="shop-icon">⚡</div>
-                        <div class="shop-info">
-                            <div class="shop-title">Ускоритель</div>
-                            <div class="shop-desc">x2 дохода на 30сек</div>
-                        </div>
-                        <button class="shop-buy" data-item="booster" data-price="200">200💰</button>
-                    </div>
-                    <div class="shop-card">
-                        <div class="shop-icon">🎰</div>
-                        <div class="shop-info">
-                            <div class="shop-title">Ключ от бокса</div>
-                            <div class="shop-desc">Гарант удачи</div>
-                        </div>
-                        <button class="shop-buy" data-item="key" data-price="150">150💰</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Скины -->
-            <div id="skins" class="tab-content">
-                <h3>🎨 Скины для кнопки</h3>
-                <div class="skins-grid">
-                    <div class="skin-card" data-skin="red" data-price="200">
-                        <div class="skin-preview skin-red"></div>
-                        <div class="skin-name">Красный</div>
-                        <div class="skin-price">200💰</div>
-                        <button class="buy-skin">Купить</button>
-                    </div>
-                    <div class="skin-card" data-skin="blue" data-price="200">
-                        <div class="skin-preview skin-blue"></div>
-                        <div class="skin-name">Синий</div>
-                        <div class="skin-price">200💰</div>
-                        <button class="buy-skin">Купить</button>
-                    </div>
-                    <div class="skin-card" data-skin="green" data-price="200">
-                        <div class="skin-preview skin-green"></div>
-                        <div class="skin-name">Зеленый</div>
-                        <div class="skin-price">200💰</div>
-                        <button class="buy-skin">Купить</button>
-                    </div>
-                    <div class="skin-card" data-skin="gold" data-price="500">
-                        <div class="skin-preview skin-gold"></div>
-                        <div class="skin-name">Золотой</div>
-                        <div class="skin-price">500💰</div>
-                        <button class="buy-skin">Купить</button>
-                    </div>
-                    <div class="skin-card" data-skin="rainbow" data-price="1000">
-                        <div class="skin-preview skin-rainbow"></div>
-                        <div class="skin-name">Радуга</div>
-                        <div class="skin-price">1000💰</div>
-                        <button class="buy-skin">Купить</button>
-                    </div>
-                    <div class="skin-card" data-skin="dark" data-price="300">
-                        <div class="skin-preview skin-dark"></div>
-                        <div class="skin-name">Темный</div>
-                        <div class="skin-price">300💰</div>
-                        <button class="buy-skin">Купить</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Промокоды -->
-            <div id="codes" class="tab-content">
-                <h3>🔑 Активация промокода</h3>
-                <div class="promo-container">
-                    <input type="text" id="promoInput" placeholder="Введите промокод">
-                    <button id="applyPromo">Активировать</button>
-                </div>
-                <div class="promo-list">
-                    <h4>Доступные коды:</h4>
-                    <div class="promo-item">🎁 START - 100💰</div>
-                    <div class="promo-item">🎁 CLICKER - 200💰</div>
-                    <div class="promo-item">🎁 GIFT - 300💰</div>
-                    <div class="promo-item">🎁 POWER - Сила +1</div>
-                    <div class="promo-item">🎁 BOX - Ключ от бокса</div>
-                </div>
-            </div>
-
-            <!-- Лидеры -->
-            <div id="leaders" class="tab-content">
-                <h3>🏆 Топ игроков</h3>
-                <div class="leaderboard" id="leaderboardList">
-                    <div class="leader-item">Загрузка...</div>
-                </div>
+            <p class="modal-hint">Никнейм должен быть уникальным</p>
+            <div class="modal-buttons">
+                <button class="btn-primary" id="loginBtn" disabled>Войти</button>
+                <button class="btn-secondary" id="loadGameFile">Загрузить .click</button>
             </div>
         </div>
     </div>
 
-    <!-- Система уведомлений -->
-    <div class="notification-container" id="notifications"></div>
+    <!-- Основная игра -->
+    <div class="game-container" id="gameContainer" style="display: none;">
+        
+        <!-- Верхняя панель -->
+        <div class="top-panel">
+            <div class="player-info" id="profileBtn">
+                <div class="avatar" id="playerAvatar">👤</div>
+                <div class="player-details">
+                    <span class="player-name" id="playerName">Игрок</span>
+                    <span class="player-level" id="playerLevel">Уровень 1</span>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+                <button class="menu-btn" id="menuToggle">☰</button>
+            </div>
+        </div>
+
+        <!-- Боковое меню (адаптивное) -->
+        <div class="side-menu" id="sideMenu">
+            <div class="menu-header">
+                <span>Меню</span>
+                <button class="close-menu" id="closeMenu">✕</button>
+            </div>
+            <div class="menu-items">
+                <button class="menu-item active" data-tab="profile">👤 Профиль</button>
+                <button class="menu-item" data-tab="friends">👥 Друзья</button>
+                <button class="menu-item" data-tab="clubs">🏰 Клубы</button>
+                <button class="menu-item" data-tab="shop">🏪 Магазин</button>
+                <button class="menu-item" data-tab="skins">🎨 Скины</button>
+                <button class="menu-item" data-tab="codes">🔑 Промокоды</button>
+                <button class="menu-item" data-tab="leaders">🏆 Топ</button>
+                <button class="menu-item" data-tab="settings">⚙️ Настройки</button>
+            </div>
+            <div class="menu-footer">
+                <button class="btn-save" id="saveToFile">💾 Сохранить</button>
+                <button class="btn-logout" id="logoutBtn">🚪 Выйти</button>
+            </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-icon">💰</span>
+                <span class="stat-value" id="balance">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-icon">⚡</span>
+                <span class="stat-value" id="power">1</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-icon">📈</span>
+                <span class="stat-value" id="cps">0</span>
+            </div>
+        </div>
+
+        <!-- Кнопка кликера -->
+        <div class="clicker-wrapper">
+            <button class="clicker-btn" id="clickBtn">
+                <span class="clicker-emoji">👆</span>
+                <span class="clicker-text">КЛИК</span>
+            </button>
+        </div>
+
+        <!-- Быстрые действия -->
+        <div class="action-row">
+            <button class="action-button" id="dailyBtn">
+                <span class="action-icon">📅</span>
+                <span class="action-text">День</span>
+            </button>
+            <button class="action-button" id="boxBtn">
+                <span class="action-icon">📦</span>
+                <span class="action-text">Бокс</span>
+            </button>
+            <button class="action-button" id="friendsQuickBtn">
+                <span class="action-icon">👥</span>
+                <span class="action-text">Друзья</span>
+            </button>
+        </div>
+
+        <!-- Контентная область -->
+        <div class="content-wrapper" id="contentWrapper">
+            <!-- Профиль -->
+            <div class="tab-content active" id="profile">
+                <div class="profile-section">
+                    <div class="profile-avatar-large">👤</div>
+                    <div class="profile-stats">
+                        <div class="stat-row">
+                            <span>Всего кликов:</span>
+                            <span id="profileClicks">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Заработано:</span>
+                            <span id="profileEarned">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Боксов открыто:</span>
+                            <span id="profileBoxes">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>Дней в игре:</span>
+                            <span id="profileDays">1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Друзья -->
+            <div class="tab-content" id="friends">
+                <h3>👥 Друзья</h3>
+                <div class="friends-container" id="friendsContainer">
+                    <!-- Динамическая загрузка -->
+                </div>
+            </div>
+
+            <!-- Клубы -->
+            <div class="tab-content" id="clubs">
+                <h3>🏰 Клубы</h3>
+                <div class="clubs-container" id="clubsContainer">
+                    <!-- Динамическая загрузка -->
+                </div>
+            </div>
+
+            <!-- Магазин -->
+            <div class="tab-content" id="shop">
+                <h3>🏪 Магазин</h3>
+                <div class="shop-grid" id="shopGrid">
+                    <!-- Динамическая загрузка -->
+                </div>
+            </div>
+
+            <!-- Скины -->
+            <div class="tab-content" id="skins">
+                <h3>🎨 Скины</h3>
+                <div class="skins-grid" id="skinsGrid">
+                    <!-- Динамическая загрузка -->
+                </div>
+            </div>
+
+            <!-- Промокоды -->
+            <div class="tab-content" id="codes">
+                <h3>🔑 Промокоды</h3>
+                <div class="codes-container">
+                    <input type="text" id="promoInput" placeholder="Введите промокод">
+                    <button class="btn-primary" id="applyPromo">Активировать</button>
+                </div>
+            </div>
+
+            <!-- Топ игроков -->
+            <div class="tab-content" id="leaders">
+                <h3>🏆 Топ игроков</h3>
+                <div class="leaderboard" id="leaderboard"></div>
+            </div>
+
+            <!-- Настройки -->
+            <div class="tab-content" id="settings">
+                <h3>⚙️ Настройки</h3>
+                <div class="settings-container" id="settingsContainer">
+                    <!-- Динамическая загрузка -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Плавающий автокликер -->
+        <div class="auto-float" id="floatingAuto">
+            <div class="auto-header">
+                <span class="auto-icon">🤖</span>
+                <span class="auto-count" id="autoCount">0</span>
+            </div>
+            <div class="auto-status" id="autoStatus">⏸️</div>
+            <div class="auto-timer" id="autoTimer">0/сек</div>
+            <div class="auto-controls">
+                <button class="auto-btn" id="autoPowerBtn">▶️</button>
+                <button class="auto-btn" id="autoTurboBtn">⚡</button>
+            </div>
+            <div class="auto-drag-handle" id="autoDragHandle">⋮⋮</div>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div class="notification-area" id="notifications"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="script.js"></script>
