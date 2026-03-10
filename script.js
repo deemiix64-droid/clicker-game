@@ -13,6 +13,7 @@ let gameState = {
     ownedSkins: ['red'],
     title: '👆 Новичок',
     titles: ['👆 Новичок'],
+    friends: [],
     lastDaily: null,
     lastGift: null,
     usedCodes: [],
@@ -34,12 +35,185 @@ let gameState = {
         maxTime: 30,
         multiplier: 2
     },
-    version: '6.3'
+    version: '6.5'
 };
 
-// ========== ТАБЛИЦА ЛИДЕРОВ ==========
+// ========== БАЗА ДАННЫХ ИГРОКОВ ==========
+let playersDB = [];
 let leaderboardDB = [];
 
+function loadPlayersDB() {
+    const saved = localStorage.getItem('players_db');
+    if (saved) {
+        try {
+            playersDB = JSON.parse(saved);
+        } catch (e) {
+            playersDB = [];
+        }
+    } else {
+        playersDB = [];
+    }
+}
+
+function savePlayersDB() {
+    localStorage.setItem('players_db', JSON.stringify(playersDB));
+}
+
+function isNicknameUnique(nickname) {
+    return !playersDB.some(p => p.name.toLowerCase() === nickname.toLowerCase());
+}
+
+function registerPlayer(nickname) {
+    const playerData = {
+        name: nickname,
+        registered: Date.now(),
+        lastSeen: Date.now(),
+        balance: gameState.balance,
+        totalClicks: gameState.totalClicks,
+        totalEarned: gameState.totalEarned,
+        autoclickers: gameState.autoclickers,
+        power: gameState.power,
+        casesOpened: gameState.casesOpened,
+        bestCaseWin: gameState.bestCaseWin,
+        daysActive: gameState.daysActive,
+        skin: gameState.skin,
+        ownedSkins: gameState.ownedSkins,
+        title: gameState.title,
+        titles: gameState.titles,
+        autoClickerLevel: gameState.autoClicker.level
+    };
+    
+    playersDB.push(playerData);
+    savePlayersDB();
+}
+
+function updatePlayerData() {
+    const index = playersDB.findIndex(p => p.name === gameState.nickname);
+    if (index >= 0) {
+        playersDB[index] = {
+            ...playersDB[index],
+            lastSeen: Date.now(),
+            balance: gameState.balance,
+            totalClicks: gameState.totalClicks,
+            totalEarned: gameState.totalEarned,
+            autoclickers: gameState.autoclickers,
+            power: gameState.power,
+            casesOpened: gameState.casesOpened,
+            bestCaseWin: gameState.bestCaseWin,
+            daysActive: gameState.daysActive,
+            skin: gameState.skin,
+            ownedSkins: gameState.ownedSkins,
+            title: gameState.title,
+            titles: gameState.titles,
+            autoClickerLevel: gameState.autoClicker.level
+        };
+        savePlayersDB();
+    }
+}
+
+// ========== ПРОСМОТР ПРОФИЛЯ ИГРОКА ==========
+function viewPlayerProfile(playerName) {
+    const player = playersDB.find(p => p.name === playerName);
+    if (!player) {
+        showNotif('❌ Ошибка', 'Игрок не найден', 'error');
+        return;
+    }
+    
+    const level = Math.floor(player.totalClicks / 100) + 1;
+    
+    const profileHTML = `
+        <div class="player-profile-modal">
+            <div class="profile-modal-content">
+                <div class="profile-modal-header">
+                    <div class="profile-modal-avatar">👤</div>
+                    <div class="profile-modal-info">
+                        <h2>${player.name}</h2>
+                        <div class="profile-modal-title">${player.title}</div>
+                    </div>
+                    <button class="profile-modal-close" onclick="closeProfileModal()">✕</button>
+                </div>
+                
+                <div class="profile-modal-stats">
+                    <div class="profile-stat-row">
+                        <span>Уровень:</span>
+                        <span class="stat-value">${level}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>💰 Баланс:</span>
+                        <span class="stat-value">${formatNumber(player.balance)}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>👆 Всего кликов:</span>
+                        <span class="stat-value">${formatNumber(player.totalClicks)}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>📈 Заработано:</span>
+                        <span class="stat-value">${formatNumber(player.totalEarned)}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>🤖 Автокликеров:</span>
+                        <span class="stat-value">${player.autoclickers}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>⚡ Сила клика:</span>
+                        <span class="stat-value">${player.power}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>🎁 Кейсов открыто:</span>
+                        <span class="stat-value">${player.casesOpened}</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>🏆 Лучший выигрыш:</span>
+                        <span class="stat-value">${formatNumber(player.bestCaseWin)}💰</span>
+                    </div>
+                    <div class="profile-stat-row">
+                        <span>📅 Дней в игре:</span>
+                        <span class="stat-value">${player.daysActive}</span>
+                    </div>
+                </div>
+                
+                <div class="profile-modal-titles">
+                    <h4>Полученные титулы (${player.titles.length})</h4>
+                    <div class="profile-titles-grid">
+                        ${player.titles.map(title => `
+                            <div class="profile-title-item">${title}</div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                ${player.name !== gameState.nickname ? `
+                    <div class="profile-modal-actions">
+                        <button class="btn-primary" onclick="addFriend('${player.name}')">➕ Добавить в друзья</button>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    const modalContainer = document.createElement('div');
+    modalContainer.id = 'profileModal';
+    modalContainer.innerHTML = profileHTML;
+    document.body.appendChild(modalContainer);
+}
+
+function closeProfileModal() {
+    const modal = document.getElementById('profileModal');
+    if (modal) modal.remove();
+}
+
+function addFriend(playerName) {
+    if (!gameState.friends) gameState.friends = [];
+    if (gameState.friends.includes(playerName)) {
+        showNotif('❌ Уже в друзьях', '', 'error');
+        return;
+    }
+    gameState.friends.push(playerName);
+    showNotif('✅ Добавлен в друзья', playerName, 'success');
+    closeProfileModal();
+    saveGame();
+}
+
+// ========== ТАБЛИЦА ЛИДЕРОВ ==========
 function loadLeaderboard() {
     const saved = localStorage.getItem('leaderboard_db');
     if (saved) {
@@ -114,7 +288,7 @@ function renderLeaderboard() {
         else if (index === 2) rankClass = 'bronze';
         
         return `
-            <div class="leader-row">
+            <div class="leader-row" onclick="viewPlayerProfile('${player.name}')">
                 <span class="leader-rank ${rankClass}">${index + 1}</span>
                 <span class="leader-name">
                     ${player.name || 'Игрок'}
@@ -128,47 +302,178 @@ function renderLeaderboard() {
 
 // ========== ТИТУЛЫ ==========
 const titles = [
-    { name: '👆 Новичок', clicks: 0 },
-    { name: '🤚 Кликер', clicks: 100 },
-    { name: '✋ Профи', clicks: 500 },
-    { name: '👊 Мастер', clicks: 1000 },
-    { name: '👑 Легенда', clicks: 5000 },
-    { name: '⚡ Бог клика', clicks: 10000 }
+    { id: 'novice', name: '👆 Новичок', desc: 'Начать играть', clicks: 0, icon: '👆' },
+    { id: 'clicker', name: '🤚 Кликер', desc: 'Сделать 100 кликов', clicks: 100, icon: '🤚' },
+    { id: 'tapper', name: '👆 Тапёр', desc: 'Сделать 250 кликов', clicks: 250, icon: '👆' },
+    { id: 'pro', name: '✋ Профи', desc: 'Сделать 500 кликов', clicks: 500, icon: '✋' },
+    { id: 'expert', name: '🖐️ Эксперт', desc: 'Сделать 1000 кликов', clicks: 1000, icon: '🖐️' },
+    { id: 'master', name: '👊 Мастер', desc: 'Сделать 2500 кликов', clicks: 2500, icon: '👊' },
+    { id: 'grandmaster', name: '🥊 Грандмастер', desc: 'Сделать 5000 кликов', clicks: 5000, icon: '🥊' },
+    { id: 'legend', name: '👑 Легенда', desc: 'Сделать 10000 кликов', clicks: 10000, icon: '👑' },
+    { id: 'mythic', name: '⚡ Мифический', desc: 'Сделать 25000 кликов', clicks: 25000, icon: '⚡' },
+    { id: 'god', name: '✨ Бог клика', desc: 'Сделать 50000 кликов', clicks: 50000, icon: '✨' },
+    { id: 'almighty', name: '🔥 Всемогущий', desc: 'Сделать 100000 кликов', clicks: 100000, icon: '🔥' },
+    { id: 'poor', name: '🥉 Бедняк', desc: 'Иметь 0 монет', balance: 0, icon: '🥉' },
+    { id: 'rich', name: '🥈 Богач', desc: 'Накопить 10000 монет', balance: 10000, icon: '🥈' },
+    { id: 'millionaire', name: '🥇 Миллионер', desc: 'Накопить 100000 монет', balance: 100000, icon: '🥇' },
+    { id: 'billionaire', name: '💎 Миллиардер', desc: 'Накопить 1000000 монет', balance: 1000000, icon: '💎' },
+    { id: 'oligarch', name: '👑 Олигарх', desc: 'Накопить 10000000 монет', balance: 10000000, icon: '👑' },
+    { id: 'auto_noob', name: '⚙️ Механик', desc: 'Купить 1 автокликер', autoclickers: 1, icon: '⚙️' },
+    { id: 'auto_pro', name: '🔧 Инженер', desc: 'Купить 10 автокликеров', autoclickers: 10, icon: '🔧' },
+    { id: 'auto_master', name: '🛠️ Техник', desc: 'Купить 25 автокликеров', autoclickers: 25, icon: '🛠️' },
+    { id: 'auto_expert', name: '⚡ Кибернетик', desc: 'Купить 50 автокликеров', autoclickers: 50, icon: '⚡' },
+    { id: 'auto_god', name: '🤖 Повелитель машин', desc: 'Купить 100 автокликеров', autoclickers: 100, icon: '🤖' },
+    { id: 'case_noob', name: '🎲 Игрок', desc: 'Открыть 1 кейс', cases: 1, icon: '🎲' },
+    { id: 'case_pro', name: '🎰 Шулер', desc: 'Открыть 10 кейсов', cases: 10, icon: '🎰' },
+    { id: 'case_master', name: '🎯 Азартный', desc: 'Открыть 25 кейсов', cases: 25, icon: '🎯' },
+    { id: 'case_expert', name: '💫 Везунчик', desc: 'Открыть 50 кейсов', cases: 50, icon: '💫' },
+    { id: 'case_god', name: '👑 Король удачи', desc: 'Открыть 100 кейсов', cases: 100, icon: '👑' },
+    { id: 'day1', name: '📅 Новичок', desc: 'Играть 1 день', days: 1, icon: '📅' },
+    { id: 'day7', name: '📆 Завсегдатай', desc: 'Играть 7 дней', days: 7, icon: '📆' },
+    { id: 'day30', name: '🗓️ Ветеран', desc: 'Играть 30 дней', days: 30, icon: '🗓️' },
+    { id: 'day100', name: '📅 Старожил', desc: 'Играть 100 дней', days: 100, icon: '📅' },
+    { id: 'day365', name: '🎂 Легенда', desc: 'Играть 365 дней', days: 365, icon: '🎂' }
 ];
 
 function checkTitles() {
-    for (let i = titles.length - 1; i >= 0; i--) {
-        if (gameState.totalClicks >= titles[i].clicks) {
-            if (!gameState.titles.includes(titles[i].name)) {
-                gameState.titles.push(titles[i].name);
-                showNotif('🏆 Новый титул!', titles[i].name, 'warning');
-            }
-            if (gameState.title !== titles[i].name) {
-                gameState.title = titles[i].name;
-            }
-            break;
+    let newTitles = [];
+    
+    titles.forEach(title => {
+        if (gameState.titles.includes(title.name)) return;
+        
+        let earned = false;
+        
+        if (title.clicks !== undefined && gameState.totalClicks >= title.clicks) earned = true;
+        if (title.balance !== undefined && gameState.balance >= title.balance) earned = true;
+        if (title.autoclickers !== undefined && gameState.autoclickers >= title.autoclickers) earned = true;
+        if (title.cases !== undefined && gameState.casesOpened >= title.cases) earned = true;
+        if (title.days !== undefined && gameState.daysActive >= title.days) earned = true;
+        
+        if (earned) {
+            newTitles.push(title.name);
+            gameState.titles.push(title.name);
+            showNotif('🏆 Новый титул!', title.name, 'warning');
         }
+    });
+    
+    if (newTitles.length > 0) {
+        renderTitles();
+        saveGame();
+        updatePlayerData();
     }
-    renderTitles();
+}
+
+function selectTitle(titleName) {
+    if (gameState.titles.includes(titleName)) {
+        gameState.title = titleName;
+        renderTitles();
+        showNotif('✅ Титул надет!', titleName, 'success');
+        saveGame();
+        updatePlayerData();
+        saveLeaderboard();
+    }
 }
 
 function renderTitles() {
     const container = document.getElementById('profileTitles');
     if (!container) return;
     
+    const clickTitles = titles.filter(t => t.clicks !== undefined);
+    const balanceTitles = titles.filter(t => t.balance !== undefined);
+    const autoTitles = titles.filter(t => t.autoclickers !== undefined);
+    const caseTitles = titles.filter(t => t.cases !== undefined);
+    const dayTitles = titles.filter(t => t.days !== undefined);
+    
     container.innerHTML = `
-        <div class="current-title">
+        <div class="current-title" onclick="selectTitle('${gameState.title}')">
             <span class="title-label">Текущий титул:</span>
             <span class="title-value">${gameState.title}</span>
         </div>
-        <div class="titles-list">
-            <span class="titles-label">Все титулы (${gameState.titles.length}/${titles.length}):</span>
+        
+        <div class="titles-category">
+            <h4>🏆 За клики</h4>
             <div class="titles-grid">
-                ${titles.map(title => {
+                ${clickTitles.map(title => {
                     const has = gameState.titles.includes(title.name);
+                    const isCurrent = gameState.title === title.name;
                     return `
-                        <div class="title-item ${has ? 'owned' : ''}">
-                            ${title.name}
+                        <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
+                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             title="${title.desc}">
+                            <span class="title-icon">${title.icon}</span>
+                            <span class="title-name">${title.name}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        
+        <div class="titles-category">
+            <h4>💰 За монеты</h4>
+            <div class="titles-grid">
+                ${balanceTitles.map(title => {
+                    const has = gameState.titles.includes(title.name);
+                    const isCurrent = gameState.title === title.name;
+                    return `
+                        <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
+                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             title="${title.desc}">
+                            <span class="title-icon">${title.icon}</span>
+                            <span class="title-name">${title.name}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        
+        <div class="titles-category">
+            <h4>🤖 За автокликеры</h4>
+            <div class="titles-grid">
+                ${autoTitles.map(title => {
+                    const has = gameState.titles.includes(title.name);
+                    const isCurrent = gameState.title === title.name;
+                    return `
+                        <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
+                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             title="${title.desc}">
+                            <span class="title-icon">${title.icon}</span>
+                            <span class="title-name">${title.name}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        
+        <div class="titles-category">
+            <h4>🎁 За кейсы</h4>
+            <div class="titles-grid">
+                ${caseTitles.map(title => {
+                    const has = gameState.titles.includes(title.name);
+                    const isCurrent = gameState.title === title.name;
+                    return `
+                        <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
+                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             title="${title.desc}">
+                            <span class="title-icon">${title.icon}</span>
+                            <span class="title-name">${title.name}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        
+        <div class="titles-category">
+            <h4>📅 За дни</h4>
+            <div class="titles-grid">
+                ${dayTitles.map(title => {
+                    const has = gameState.titles.includes(title.name);
+                    const isCurrent = gameState.title === title.name;
+                    return `
+                        <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
+                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             title="${title.desc}">
+                            <span class="title-icon">${title.icon}</span>
+                            <span class="title-name">${title.name}</span>
                         </div>
                     `;
                 }).join('')}
@@ -187,6 +492,7 @@ function formatNumber(num) {
 function saveGame() {
     try {
         localStorage.setItem('clicker_save', JSON.stringify(gameState));
+        updatePlayerData();
         saveLeaderboard();
         return true;
     } catch (e) {
@@ -244,6 +550,7 @@ function loadClickFile() {
                 renderSkins();
                 renderCases();
                 renderTitles();
+                updatePlayerData();
                 saveLeaderboard();
                 
                 showNotif('✅ Успешно', 'Игра загружена');
@@ -340,6 +647,7 @@ function updateTurboUI() {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Игра запускается...');
     
+    loadPlayersDB();
     loadLeaderboard();
     
     if (loadGame() && gameState.nickname) {
@@ -347,6 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('profileName').textContent = gameState.nickname;
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
+        updatePlayerData();
     }
     
     const theme = localStorage.getItem('theme') || 'dark';
@@ -372,12 +681,18 @@ function initEvents() {
             return;
         }
         
+        if (!isNicknameUnique(name)) {
+            showNotif('❌ Ошибка', 'Этот ник уже занят', 'error');
+            return;
+        }
+        
         gameState.nickname = name;
         document.getElementById('playerName').textContent = name;
         document.getElementById('profileName').textContent = name;
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
         
+        registerPlayer(name);
         saveGame();
         saveLeaderboard();
         showNotif('✅ Добро пожаловать!', `Привет, ${name}!`);
@@ -461,6 +776,7 @@ function initEvents() {
             gameState.lastDaily = today;
             gameState.daysActive++;
             showNotif('📅 Награда!', '+500 монет');
+            checkTitles();
             updateUI();
             saveGame();
             saveLeaderboard();
@@ -607,6 +923,7 @@ function initEvents() {
             gameState.autoClicker.level = level + 1;
             gameState.autoClicker.maxTime += 30;
             showNotif('⬆️ Улучшено!', `Уровень ${gameState.autoClicker.level}`, 'success');
+            checkTitles();
             updateUI();
             updateAutoMenu();
             saveGame();
@@ -689,23 +1006,36 @@ function renderShop() {
     `;
 }
 
-window.buyItem = (type) => {
-    if (type === 'auto' && gameState.balance >= 50) {
-        gameState.balance -= 50;
-        gameState.autoclickers++;
-        showNotif('✅ Куплено!', `Автокликер +${gameState.autoclickers}`);
-    } else if (type === 'power' && gameState.balance >= 100) {
-        gameState.balance -= 100;
-        gameState.power++;
-        showNotif('✅ Куплено!', `Сила +${gameState.power}`);
-    } else if (type === 'turbo' && gameState.balance >= 50) {
-        gameState.balance -= 50;
-        activateTurbo();
-    } else {
-        showNotif('❌ Недостаточно', '', 'error');
-        return;
+window.buyItem = function(type) {
+    if (type === 'auto') {
+        if (gameState.balance >= 50) {
+            gameState.balance -= 50;
+            gameState.autoclickers++;
+            showNotif('✅ Куплено!', `Автокликер +${gameState.autoclickers}`);
+            checkTitles();
+        } else {
+            showNotif('❌ Недостаточно', 'Нужно 50💰', 'error');
+            return;
+        }
+    } else if (type === 'power') {
+        if (gameState.balance >= 100) {
+            gameState.balance -= 100;
+            gameState.power++;
+            showNotif('✅ Куплено!', `Сила +${gameState.power}`);
+        } else {
+            showNotif('❌ Недостаточно', 'Нужно 100💰', 'error');
+            return;
+        }
+    } else if (type === 'turbo') {
+        if (gameState.balance >= 50) {
+            gameState.balance -= 50;
+            activateTurbo();
+        } else {
+            showNotif('❌ Недостаточно', 'Нужно 50💰', 'error');
+            return;
+        }
     }
-    checkTitles();
+    
     updateUI();
     updateAutoMenu();
     saveGame();
@@ -793,7 +1123,7 @@ function renderCases() {
     `;
 }
 
-window.openCase = (type) => {
+window.openCase = function(type) {
     let price, reward;
     
     if (type === 'normal') {
@@ -985,3 +1315,7 @@ function updateUI() {
 // ========== ГЛОБАЛЬНЫЕ ФУНКЦИИ ==========
 window.buyItem = buyItem;
 window.openCase = openCase;
+window.selectTitle = selectTitle;
+window.viewPlayerProfile = viewPlayerProfile;
+window.closeProfileModal = closeProfileModal;
+window.addFriend = addFriend;
