@@ -577,69 +577,98 @@ body {
     margin-top: 20px;
     padding: 15px;
     background: var(--surface-2);
-    border-radius: 15px;
+    border-radius: 20px;
 }
 
 .current-title {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 15px;
-    padding: 10px;
-    background: var(--surface);
-    border-radius: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.current-title:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px var(--accent);
 }
 
 .title-label {
-    color: var(--text-2);
-    font-size: 13px;
+    color: white;
+    font-size: 14px;
+    opacity: 0.9;
 }
 
 .title-value {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: bold;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: white;
 }
 
-.titles-label {
-    display: block;
-    color: var(--text-2);
-    font-size: 13px;
+.titles-category {
+    margin-bottom: 20px;
+}
+
+.titles-category h4 {
+    color: var(--text);
+    font-size: 14px;
     margin-bottom: 10px;
+    padding-left: 5px;
 }
 
 .titles-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 8px;
-    max-height: 200px;
-    overflow-y: auto;
-    padding: 5px;
 }
 
 .title-item {
-    padding: 8px 5px;
+    position: relative;
+    padding: 10px 5px;
     background: var(--surface);
-    border-radius: 8px;
+    border-radius: 12px;
     text-align: center;
-    font-size: 11px;
-    color: var(--text-2);
     cursor: pointer;
     transition: all 0.2s;
     border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.title-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px var(--shadow);
 }
 
 .title-item.owned {
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: white;
     border: none;
 }
 
-.title-item.owned:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 15px var(--accent);
+.title-item.owned .title-name {
+    color: white;
+}
+
+.title-item.current {
+    border: 2px solid gold;
+    box-shadow: 0 0 15px gold;
+}
+
+.title-icon {
+    font-size: 20px;
+}
+
+.title-name {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-2);
+    word-break: break-word;
 }
 
 /* МАГАЗИН */
@@ -859,10 +888,17 @@ body {
     padding: 12px;
     gap: 10px;
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 .leader-row:last-child {
     border-bottom: none;
+}
+
+.leader-row:hover {
+    background: var(--surface);
+    transform: translateX(5px);
 }
 
 .leader-rank {
@@ -1265,6 +1301,141 @@ body {
     to { transform: translateX(0); opacity: 1; }
 }
 
+/* МОДАЛЬНОЕ ОКНО ПРОФИЛЯ */
+.player-profile-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.95);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20000;
+    padding: 20px;
+}
+
+.profile-modal-content {
+    background: var(--surface);
+    border-radius: 30px;
+    width: min(500px, 95%);
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 2px solid var(--accent);
+    animation: modalAppear 0.3s;
+}
+
+.profile-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+
+.profile-modal-avatar {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    border: 2px solid var(--text);
+}
+
+.profile-modal-info {
+    flex: 1;
+}
+
+.profile-modal-info h2 {
+    font-size: 20px;
+    margin-bottom: 5px;
+}
+
+.profile-modal-title {
+    color: var(--accent);
+    font-size: 14px;
+}
+
+.profile-modal-close {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+}
+
+.profile-modal-stats {
+    padding: 20px;
+}
+
+.profile-stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.profile-stat-row:last-child {
+    border-bottom: none;
+}
+
+.profile-stat-row .stat-value {
+    color: var(--accent);
+    font-weight: bold;
+}
+
+.profile-modal-titles {
+    padding: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.profile-modal-titles h4 {
+    margin-bottom: 15px;
+    color: var(--text);
+}
+
+.profile-titles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.profile-title-item {
+    padding: 8px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-2);
+}
+
+.profile-modal-actions {
+    padding: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.profile-modal-actions button {
+    width: 100%;
+    padding: 12px;
+}
+
 /* АДАПТАЦИЯ */
 @media (max-width: 480px) {
     .stats-row {
@@ -1323,6 +1494,15 @@ body {
     .titles-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+    
+    .profile-modal-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .profile-titles-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 @media (max-width: 360px) {
@@ -1332,14 +1512,6 @@ body {
     
     .cases-grid {
         grid-template-columns: 1fr;
-    }
-    
-    .pass-level {
-        padding: 5px 10px;
-    }
-    
-    .pass-level-number {
-        font-size: 16px;
     }
 }
 
