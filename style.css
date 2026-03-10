@@ -642,7 +642,7 @@ body {
     border-bottom: none;
 }
 
-/* ТАБЛИЦА ЛИДЕРОВ (НОВОЕ) */
+/* ТАБЛИЦА ЛИДЕРОВ */
 .leaderboard {
     background: var(--surface2);
     border-radius: 12px;
@@ -675,32 +675,51 @@ body {
     font-size: 14px;
 }
 
-.leader-row:nth-child(1) .rank {
-    background: var(--gold);
-    color: #000;
-}
-
-.leader-row:nth-child(2) .rank {
-    background: var(--silver);
-    color: #000;
-}
-
-.leader-row:nth-child(3) .rank {
-    background: var(--bronze);
-    color: #000;
+.rank.top {
+    background: linear-gradient(135deg, #f1c40f, #e67e22);
+    color: white;
 }
 
 .leader-name {
     flex: 1;
     font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .leader-score {
     font-weight: bold;
     color: var(--accent);
+    white-space: nowrap;
 }
 
-/* МЕНЮ АВТОКЛИКЕРА (НОВОЕ) */
+/* НАСТРОЙКИ */
+.settings {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 5px;
+}
+
+.switch {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.switch:last-child {
+    border-bottom: none;
+}
+
+.switch input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+/* МЕНЮ АВТОКЛИКЕРА */
 .auto-menu {
     position: fixed;
     bottom: 0;
