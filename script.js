@@ -35,18 +35,21 @@ let gameState = {
         maxTime: 30,
         multiplier: 2
     },
-    version: '6.5'
+    version: '6.6'
 };
 
 // ========== БАЗА ДАННЫХ ИГРОКОВ ==========
 let playersDB = [];
 let leaderboardDB = [];
 
+// Загрузка базы игроков
 function loadPlayersDB() {
     const saved = localStorage.getItem('players_db');
     if (saved) {
         try {
             playersDB = JSON.parse(saved);
+            // Фильтруем битые записи
+            playersDB = playersDB.filter(p => p && p.name);
         } catch (e) {
             playersDB = [];
         }
@@ -55,57 +58,71 @@ function loadPlayersDB() {
     }
 }
 
+// Сохранение базы игроков
 function savePlayersDB() {
-    localStorage.setItem('players_db', JSON.stringify(playersDB));
+    try {
+        localStorage.setItem('players_db', JSON.stringify(playersDB));
+    } catch (e) {
+        console.error('Ошибка сохранения players_db:', e);
+    }
 }
 
+// Проверка уникальности ника
 function isNicknameUnique(nickname) {
-    return !playersDB.some(p => p.name.toLowerCase() === nickname.toLowerCase());
+    if (!nickname) return false;
+    return !playersDB.some(p => p && p.name && p.name.toLowerCase() === nickname.toLowerCase());
 }
 
+// Регистрация нового игрока
 function registerPlayer(nickname) {
+    if (!nickname) return;
+    
     const playerData = {
         name: nickname,
         registered: Date.now(),
         lastSeen: Date.now(),
-        balance: gameState.balance,
-        totalClicks: gameState.totalClicks,
-        totalEarned: gameState.totalEarned,
-        autoclickers: gameState.autoclickers,
-        power: gameState.power,
-        casesOpened: gameState.casesOpened,
-        bestCaseWin: gameState.bestCaseWin,
-        daysActive: gameState.daysActive,
-        skin: gameState.skin,
-        ownedSkins: gameState.ownedSkins,
-        title: gameState.title,
-        titles: gameState.titles,
-        autoClickerLevel: gameState.autoClicker.level
+        balance: gameState.balance || 0,
+        totalClicks: gameState.totalClicks || 0,
+        totalEarned: gameState.totalEarned || 0,
+        autoclickers: gameState.autoclickers || 0,
+        power: gameState.power || 1,
+        casesOpened: gameState.casesOpened || 0,
+        bestCaseWin: gameState.bestCaseWin || 0,
+        daysActive: gameState.daysActive || 1,
+        skin: gameState.skin || 'red',
+        ownedSkins: gameState.ownedSkins || ['red'],
+        title: gameState.title || '👆 Новичок',
+        titles: gameState.titles || ['👆 Новичок'],
+        autoClickerLevel: gameState.autoClicker?.level || 1
     };
     
     playersDB.push(playerData);
     savePlayersDB();
 }
 
+// Обновление данных игрока
 function updatePlayerData() {
-    const index = playersDB.findIndex(p => p.name === gameState.nickname);
+    if (!gameState.nickname) return;
+    
+    const index = playersDB.findIndex(p => p && p.name === gameState.nickname);
     if (index >= 0) {
         playersDB[index] = {
             ...playersDB[index],
+            name: gameState.nickname,
             lastSeen: Date.now(),
-            balance: gameState.balance,
-            totalClicks: gameState.totalClicks,
-            totalEarned: gameState.totalEarned,
-            autoclickers: gameState.autoclickers,
-            power: gameState.power,
-            casesOpened: gameState.casesOpened,
-            bestCaseWin: gameState.bestCaseWin,
-            daysActive: gameState.daysActive,
-            skin: gameState.skin,
-            ownedSkins: gameState.ownedSkins,
-            title: gameState.title,
-            titles: gameState.titles,
-            autoClickerLevel: gameState.autoClicker.level
+            balance: gameState.balance || 0,
+            totalClicks: gameState.totalClicks || 0,
+            totalEarned: gameState.totalEarned || 0,
+            autoclickers: gameState.autoclickers || 0,
+            power: gameState.power || 1,
+            casesOpened: gameState.casesOpened || 0,
+            bestCaseWin: gameState.bestCaseWin || 0,
+            daysActive: gameState.daysActive || 1,
+            skin: gameState.skin || 'red',
+            ownedSkins: gameState.ownedSkins || ['red'],
+            title: gameState.title || '👆 Новичок',
+            titles: gameState.titles || ['👆 Новичок'],
+            autoClickerLevel: gameState.autoClicker?.level || 1
         };
         savePlayersDB();
     }
@@ -113,13 +130,15 @@ function updatePlayerData() {
 
 // ========== ПРОСМОТР ПРОФИЛЯ ИГРОКА ==========
 function viewPlayerProfile(playerName) {
-    const player = playersDB.find(p => p.name === playerName);
+    if (!playerName) return;
+    
+    const player = playersDB.find(p => p && p.name === playerName);
     if (!player) {
         showNotif('❌ Ошибка', 'Игрок не найден', 'error');
         return;
     }
     
-    const level = Math.floor(player.totalClicks / 100) + 1;
+    const level = Math.floor((player.totalClicks || 0) / 100) + 1;
     
     const profileHTML = `
         <div class="player-profile-modal">
@@ -127,8 +146,8 @@ function viewPlayerProfile(playerName) {
                 <div class="profile-modal-header">
                     <div class="profile-modal-avatar">👤</div>
                     <div class="profile-modal-info">
-                        <h2>${player.name}</h2>
-                        <div class="profile-modal-title">${player.title}</div>
+                        <h2>${player.name || 'Игрок'}</h2>
+                        <div class="profile-modal-title">${player.title || '👆 Новичок'}</div>
                     </div>
                     <button class="profile-modal-close" onclick="closeProfileModal()">✕</button>
                 </div>
@@ -140,42 +159,42 @@ function viewPlayerProfile(playerName) {
                     </div>
                     <div class="profile-stat-row">
                         <span>💰 Баланс:</span>
-                        <span class="stat-value">${formatNumber(player.balance)}</span>
+                        <span class="stat-value">${formatNumber(player.balance || 0)}</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>👆 Всего кликов:</span>
-                        <span class="stat-value">${formatNumber(player.totalClicks)}</span>
+                        <span class="stat-value">${formatNumber(player.totalClicks || 0)}</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>📈 Заработано:</span>
-                        <span class="stat-value">${formatNumber(player.totalEarned)}</span>
+                        <span class="stat-value">${formatNumber(player.totalEarned || 0)}</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>🤖 Автокликеров:</span>
-                        <span class="stat-value">${player.autoclickers}</span>
+                        <span class="stat-value">${player.autoclickers || 0}</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>⚡ Сила клика:</span>
-                        <span class="stat-value">${player.power}</span>
+                        <span class="stat-value">${player.power || 1}</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>🎁 Кейсов открыто:</span>
-                        <span class="stat-value">${player.casesOpened}</span>
+                        <span class="stat-value">${player.casesOpened || 0}</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>🏆 Лучший выигрыш:</span>
-                        <span class="stat-value">${formatNumber(player.bestCaseWin)}💰</span>
+                        <span class="stat-value">${formatNumber(player.bestCaseWin || 0)}💰</span>
                     </div>
                     <div class="profile-stat-row">
                         <span>📅 Дней в игре:</span>
-                        <span class="stat-value">${player.daysActive}</span>
+                        <span class="stat-value">${player.daysActive || 1}</span>
                     </div>
                 </div>
                 
                 <div class="profile-modal-titles">
-                    <h4>Полученные титулы (${player.titles.length})</h4>
+                    <h4>Полученные титулы (${(player.titles || []).length})</h4>
                     <div class="profile-titles-grid">
-                        ${player.titles.map(title => `
+                        ${(player.titles || []).map(title => `
                             <div class="profile-title-item">${title}</div>
                         `).join('')}
                     </div>
@@ -190,6 +209,10 @@ function viewPlayerProfile(playerName) {
         </div>
     `;
     
+    // Удаляем старую модалку если есть
+    const oldModal = document.getElementById('profileModal');
+    if (oldModal) oldModal.remove();
+    
     const modalContainer = document.createElement('div');
     modalContainer.id = 'profileModal';
     modalContainer.innerHTML = profileHTML;
@@ -202,6 +225,7 @@ function closeProfileModal() {
 }
 
 function addFriend(playerName) {
+    if (!playerName) return;
     if (!gameState.friends) gameState.friends = [];
     if (gameState.friends.includes(playerName)) {
         showNotif('❌ Уже в друзьях', '', 'error');
@@ -219,6 +243,7 @@ function loadLeaderboard() {
     if (saved) {
         try {
             leaderboardDB = JSON.parse(saved);
+            // Фильтруем битые записи
             leaderboardDB = leaderboardDB.filter(player => {
                 if (!player || !player.name) return false;
                 const name = player.name.toLowerCase().trim();
@@ -244,12 +269,12 @@ function loadLeaderboard() {
 function saveLeaderboard() {
     try {
         if (gameState.nickname && gameState.nickname.length >= 3) {
-            const playerScore = isNaN(gameState.balance) ? 0 : Math.floor(gameState.balance);
-            leaderboardDB = leaderboardDB.filter(p => p.name !== gameState.nickname);
+            const playerScore = isNaN(gameState.balance) ? 0 : Math.floor(gameState.balance || 0);
+            leaderboardDB = leaderboardDB.filter(p => p && p.name !== gameState.nickname);
             leaderboardDB.push({
                 name: gameState.nickname,
                 score: playerScore,
-                title: gameState.title,
+                title: gameState.title || '👆 Новичок',
                 lastUpdate: Date.now()
             });
         }
@@ -336,21 +361,24 @@ const titles = [
 ];
 
 function checkTitles() {
+    if (!gameState) return;
+    
     let newTitles = [];
     
     titles.forEach(title => {
-        if (gameState.titles.includes(title.name)) return;
+        if (gameState.titles && gameState.titles.includes(title.name)) return;
         
         let earned = false;
         
-        if (title.clicks !== undefined && gameState.totalClicks >= title.clicks) earned = true;
-        if (title.balance !== undefined && gameState.balance >= title.balance) earned = true;
-        if (title.autoclickers !== undefined && gameState.autoclickers >= title.autoclickers) earned = true;
-        if (title.cases !== undefined && gameState.casesOpened >= title.cases) earned = true;
-        if (title.days !== undefined && gameState.daysActive >= title.days) earned = true;
+        if (title.clicks !== undefined && (gameState.totalClicks || 0) >= title.clicks) earned = true;
+        if (title.balance !== undefined && (gameState.balance || 0) >= title.balance) earned = true;
+        if (title.autoclickers !== undefined && (gameState.autoclickers || 0) >= title.autoclickers) earned = true;
+        if (title.cases !== undefined && (gameState.casesOpened || 0) >= title.cases) earned = true;
+        if (title.days !== undefined && (gameState.daysActive || 0) >= title.days) earned = true;
         
         if (earned) {
             newTitles.push(title.name);
+            if (!gameState.titles) gameState.titles = ['👆 Новичок'];
             gameState.titles.push(title.name);
             showNotif('🏆 Новый титул!', title.name, 'warning');
         }
@@ -364,7 +392,8 @@ function checkTitles() {
 }
 
 function selectTitle(titleName) {
-    if (gameState.titles.includes(titleName)) {
+    if (!titleName) return;
+    if (gameState.titles && gameState.titles.includes(titleName)) {
         gameState.title = titleName;
         renderTitles();
         showNotif('✅ Титул надет!', titleName, 'success');
@@ -377,6 +406,8 @@ function selectTitle(titleName) {
 function renderTitles() {
     const container = document.getElementById('profileTitles');
     if (!container) return;
+    if (!gameState.titles) gameState.titles = ['👆 Новичок'];
+    if (!gameState.title) gameState.title = '👆 Новичок';
     
     const clickTitles = titles.filter(t => t.clicks !== undefined);
     const balanceTitles = titles.filter(t => t.balance !== undefined);
@@ -385,7 +416,7 @@ function renderTitles() {
     const dayTitles = titles.filter(t => t.days !== undefined);
     
     container.innerHTML = `
-        <div class="current-title" onclick="selectTitle('${gameState.title}')">
+        <div class="current-title" onclick="selectTitle('${gameState.title.replace(/'/g, "\\'")}')">
             <span class="title-label">Текущий титул:</span>
             <span class="title-value">${gameState.title}</span>
         </div>
@@ -398,7 +429,7 @@ function renderTitles() {
                     const isCurrent = gameState.title === title.name;
                     return `
                         <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
-                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             onclick="${has ? `selectTitle('${title.name.replace(/'/g, "\\'")}')` : ''}"
                              title="${title.desc}">
                             <span class="title-icon">${title.icon}</span>
                             <span class="title-name">${title.name}</span>
@@ -416,7 +447,7 @@ function renderTitles() {
                     const isCurrent = gameState.title === title.name;
                     return `
                         <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
-                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             onclick="${has ? `selectTitle('${title.name.replace(/'/g, "\\'")}')` : ''}"
                              title="${title.desc}">
                             <span class="title-icon">${title.icon}</span>
                             <span class="title-name">${title.name}</span>
@@ -434,7 +465,7 @@ function renderTitles() {
                     const isCurrent = gameState.title === title.name;
                     return `
                         <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
-                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             onclick="${has ? `selectTitle('${title.name.replace(/'/g, "\\'")}')` : ''}"
                              title="${title.desc}">
                             <span class="title-icon">${title.icon}</span>
                             <span class="title-name">${title.name}</span>
@@ -452,7 +483,7 @@ function renderTitles() {
                     const isCurrent = gameState.title === title.name;
                     return `
                         <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
-                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             onclick="${has ? `selectTitle('${title.name.replace(/'/g, "\\'")}')` : ''}"
                              title="${title.desc}">
                             <span class="title-icon">${title.icon}</span>
                             <span class="title-name">${title.name}</span>
@@ -470,7 +501,7 @@ function renderTitles() {
                     const isCurrent = gameState.title === title.name;
                     return `
                         <div class="title-item ${has ? 'owned' : ''} ${isCurrent ? 'current' : ''}" 
-                             onclick="${has ? `selectTitle('${title.name}')` : ''}"
+                             onclick="${has ? `selectTitle('${title.name.replace(/'/g, "\\'")}')` : ''}"
                              title="${title.desc}">
                             <span class="title-icon">${title.icon}</span>
                             <span class="title-name">${title.name}</span>
@@ -484,7 +515,7 @@ function renderTitles() {
 
 // ========== ФОРМАТИРОВАНИЕ ЧИСЕЛ ==========
 function formatNumber(num) {
-    if (isNaN(num) || num === null || num === undefined) return '0';
+    if (num === undefined || num === null || isNaN(num)) return '0';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
@@ -506,6 +537,12 @@ function loadGame() {
         const saved = localStorage.getItem('clicker_save');
         if (saved) {
             const data = JSON.parse(saved);
+            // Защита от NaN
+            Object.keys(data).forEach(key => {
+                if (typeof data[key] === 'number' && isNaN(data[key])) {
+                    data[key] = 0;
+                }
+            });
             gameState = { ...gameState, ...data };
             return true;
         }
@@ -538,6 +575,14 @@ function loadClickFile() {
         reader.onload = function(event) {
             try {
                 const data = JSON.parse(event.target.result);
+                
+                // Защита от NaN
+                Object.keys(data).forEach(key => {
+                    if (typeof data[key] === 'number' && isNaN(data[key])) {
+                        data[key] = 0;
+                    }
+                });
+                
                 gameState = { ...gameState, ...data };
                 
                 document.getElementById('playerName').textContent = gameState.nickname || 'Игрок';
@@ -570,7 +615,7 @@ function loadClickFile() {
 
 // ========== УВЕДОМЛЕНИЯ ==========
 function showNotif(title, msg, type = 'success') {
-    if (!gameState.settings.notifications && type !== 'error') return;
+    if (!gameState.settings || !gameState.settings.notifications && type !== 'error') return;
     
     const box = document.getElementById('notifications');
     if (!box) return;
@@ -585,7 +630,7 @@ function showNotif(title, msg, type = 'success') {
         setTimeout(() => n.remove(), 300);
     }, 3000);
     
-    if (gameState.settings.vibration && type === 'success') {
+    if (gameState.settings && gameState.settings.vibration && type === 'success') {
         navigator.vibrate?.(50);
     }
 }
@@ -594,14 +639,14 @@ function showNotif(title, msg, type = 'success') {
 function activateTurbo() {
     const turboPrice = 50;
     
-    if (gameState.balance < turboPrice) {
+    if ((gameState.balance || 0) < turboPrice) {
         showNotif('❌ Недостаточно', `Нужно ${turboPrice}💰`, 'error');
         return false;
     }
     
     gameState.balance -= turboPrice;
     gameState.turbo.active = true;
-    gameState.turbo.timeLeft = gameState.turbo.maxTime;
+    gameState.turbo.timeLeft = gameState.turbo.maxTime || 30;
     
     const indicator = document.getElementById('turboIndicator');
     if (indicator) indicator.style.display = 'block';
@@ -626,11 +671,11 @@ function updateTurboUI() {
     
     if (!turboStatus || !turboTimer || !turboProgress) return;
     
-    if (gameState.turbo.active && gameState.turbo.timeLeft > 0) {
+    if (gameState.turbo && gameState.turbo.active && (gameState.turbo.timeLeft || 0) > 0) {
         turboStatus.innerHTML = `<span class="turbo-icon">⚡</span><span>Турбо АКТИВЕН (x2)</span>`;
-        const seconds = gameState.turbo.timeLeft;
+        const seconds = gameState.turbo.timeLeft || 0;
         turboTimer.textContent = `0:${seconds.toString().padStart(2, '0')}`;
-        const progress = (seconds / gameState.turbo.maxTime) * 100;
+        const progress = (seconds / (gameState.turbo.maxTime || 30)) * 100;
         turboProgress.style.width = progress + '%';
         if (turboIndicator) turboIndicator.style.display = 'block';
         if (clicker) clicker.classList.add('turbo-active');
@@ -676,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function initEvents() {
     document.getElementById('loginBtn').addEventListener('click', () => {
         const name = document.getElementById('loginInput').value.trim();
-        if (name.length < 3) {
+        if (!name || name.length < 3) {
             showNotif('❌ Ошибка', 'Минимум 3 символа', 'error');
             return;
         }
@@ -752,12 +797,12 @@ function initEvents() {
     });
     
     document.getElementById('clickBtn').addEventListener('click', () => {
-        const multiplier = gameState.turbo.active ? gameState.turbo.multiplier : 1;
-        const gain = gameState.power * multiplier;
+        const multiplier = (gameState.turbo && gameState.turbo.active) ? (gameState.turbo.multiplier || 2) : 1;
+        const gain = (gameState.power || 1) * multiplier;
         
-        gameState.balance += gain;
-        gameState.totalClicks++;
-        gameState.totalEarned += gain;
+        gameState.balance = (gameState.balance || 0) + gain;
+        gameState.totalClicks = (gameState.totalClicks || 0) + 1;
+        gameState.totalEarned = (gameState.totalEarned || 0) + gain;
         
         const btn = document.getElementById('clickBtn');
         btn.style.transform = 'scale(0.9)';
@@ -772,9 +817,9 @@ function initEvents() {
         const today = new Date().toDateString();
         
         if (gameState.lastDaily !== today) {
-            gameState.balance += 500;
+            gameState.balance = (gameState.balance || 0) + 500;
             gameState.lastDaily = today;
-            gameState.daysActive++;
+            gameState.daysActive = (gameState.daysActive || 1) + 1;
             showNotif('📅 Награда!', '+500 монет');
             checkTitles();
             updateUI();
@@ -790,7 +835,7 @@ function initEvents() {
         const last = gameState.lastGift || 0;
         
         if (now - last >= 86400000) {
-            gameState.balance += 50;
+            gameState.balance = (gameState.balance || 0) + 50;
             gameState.lastGift = now;
             showNotif('🎁 Подарок!', '+50 монет');
             updateUI();
@@ -841,7 +886,7 @@ function initEvents() {
             return;
         }
         
-        if (gameState.usedCodes.includes(code)) {
+        if (gameState.usedCodes && gameState.usedCodes.includes(code)) {
             showNotif('❌ Уже использован', '', 'error');
             return;
         }
@@ -850,15 +895,15 @@ function initEvents() {
         
         switch(code) {
             case 'START':
-                gameState.balance += 100;
+                gameState.balance = (gameState.balance || 0) + 100;
                 msg = '+100💰';
                 break;
             case 'GIFT':
-                gameState.balance += 300;
+                gameState.balance = (gameState.balance || 0) + 300;
                 msg = '+300💰';
                 break;
             case 'POWER':
-                gameState.power++;
+                gameState.power = (gameState.power || 1) + 1;
                 msg = 'Сила +1';
                 break;
             case 'TURBO':
@@ -870,6 +915,7 @@ function initEvents() {
                 return;
         }
         
+        if (!gameState.usedCodes) gameState.usedCodes = [];
         gameState.usedCodes.push(code);
         document.getElementById('promoInput').value = '';
         showNotif('✅ Промокод!', msg);
@@ -880,23 +926,27 @@ function initEvents() {
     });
     
     document.getElementById('notificationsCheck').addEventListener('change', (e) => {
+        if (!gameState.settings) gameState.settings = {};
         gameState.settings.notifications = e.target.checked;
     });
     
     document.getElementById('vibrationCheck').addEventListener('change', (e) => {
+        if (!gameState.settings) gameState.settings = {};
         gameState.settings.vibration = e.target.checked;
     });
     
     document.getElementById('autosaveCheck').addEventListener('change', (e) => {
+        if (!gameState.settings) gameState.settings = {};
         gameState.settings.autoSave = e.target.checked;
     });
     
     document.getElementById('soundsCheck').addEventListener('change', (e) => {
+        if (!gameState.settings) gameState.settings = {};
         gameState.settings.sounds = e.target.checked;
     });
     
     document.getElementById('autoMenuStart').addEventListener('click', () => {
-        if (gameState.autoclickers === 0) {
+        if (!gameState.autoclickers || gameState.autoclickers === 0) {
             showNotif('❌ Ошибка', 'Купите автокликер', 'error');
             return;
         }
@@ -906,8 +956,8 @@ function initEvents() {
             showNotif('⏸️ Автокликер остановлен', '', 'info');
         } else {
             gameState.autoClicker.enabled = true;
-            gameState.autoClicker.timeLeft = gameState.autoClicker.maxTime;
-            showNotif('▶️ Автокликер запущен', `Будет работать ${gameState.autoClicker.maxTime} сек`, 'success');
+            gameState.autoClicker.timeLeft = gameState.autoClicker.maxTime || 120;
+            showNotif('▶️ Автокликер запущен', `Будет работать ${gameState.autoClicker.maxTime || 120} сек`, 'success');
         }
         
         updateAutoMenu();
@@ -915,13 +965,13 @@ function initEvents() {
     });
     
     document.getElementById('autoMenuUpgrade').addEventListener('click', () => {
-        const level = gameState.autoClicker.level;
+        const level = gameState.autoClicker.level || 1;
         const price = 100 * level;
         
-        if (gameState.balance >= price) {
+        if ((gameState.balance || 0) >= price) {
             gameState.balance -= price;
             gameState.autoClicker.level = level + 1;
-            gameState.autoClicker.maxTime += 30;
+            gameState.autoClicker.maxTime = (gameState.autoClicker.maxTime || 120) + 30;
             showNotif('⬆️ Улучшено!', `Уровень ${gameState.autoClicker.level}`, 'success');
             checkTitles();
             updateUI();
@@ -940,9 +990,9 @@ function initEvents() {
 
 // ========== ОБНОВЛЕНИЕ МЕНЮ АВТОКЛИКЕРА ==========
 function updateAutoMenu() {
-    const level = gameState.autoClicker.level;
-    const count = gameState.autoclickers;
-    const power = gameState.power;
+    const level = gameState.autoClicker?.level || 1;
+    const count = gameState.autoclickers || 0;
+    const power = gameState.power || 1;
     
     document.getElementById('autoMenuLevel').textContent = level;
     document.getElementById('autoMenuCount').textContent = count;
@@ -951,22 +1001,22 @@ function updateAutoMenu() {
     
     const startBtn = document.getElementById('autoMenuStart');
     if (startBtn) {
-        startBtn.innerHTML = gameState.autoClicker.enabled ? 
+        startBtn.innerHTML = gameState.autoClicker?.enabled ? 
             '<span>⏹️</span><span>Остановить</span>' : 
             '<span>▶️</span><span>Запустить</span>';
     }
     
-    if (gameState.autoClicker.enabled) {
-        const timeLeft = gameState.autoClicker.timeLeft;
+    if (gameState.autoClicker?.enabled) {
+        const timeLeft = gameState.autoClicker.timeLeft || 0;
         const minutes = Math.floor(timeLeft / 60);
         const seconds = timeLeft % 60;
         document.getElementById('autoMenuTimer').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         
-        const maxTime = gameState.autoClicker.maxTime;
+        const maxTime = gameState.autoClicker.maxTime || 120;
         const progress = maxTime > 0 ? ((maxTime - timeLeft) / maxTime) * 100 : 0;
         document.getElementById('autoMenuProgress').style.width = Math.min(100, Math.max(0, progress)) + '%';
     } else {
-        const maxTime = gameState.autoClicker.maxTime;
+        const maxTime = gameState.autoClicker?.maxTime || 120;
         const minutes = Math.floor(maxTime / 60);
         const seconds = maxTime % 60;
         document.getElementById('autoMenuTimer').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -1008,9 +1058,9 @@ function renderShop() {
 
 window.buyItem = function(type) {
     if (type === 'auto') {
-        if (gameState.balance >= 50) {
+        if ((gameState.balance || 0) >= 50) {
             gameState.balance -= 50;
-            gameState.autoclickers++;
+            gameState.autoclickers = (gameState.autoclickers || 0) + 1;
             showNotif('✅ Куплено!', `Автокликер +${gameState.autoclickers}`);
             checkTitles();
         } else {
@@ -1018,16 +1068,16 @@ window.buyItem = function(type) {
             return;
         }
     } else if (type === 'power') {
-        if (gameState.balance >= 100) {
+        if ((gameState.balance || 0) >= 100) {
             gameState.balance -= 100;
-            gameState.power++;
+            gameState.power = (gameState.power || 1) + 1;
             showNotif('✅ Куплено!', `Сила +${gameState.power}`);
         } else {
             showNotif('❌ Недостаточно', 'Нужно 100💰', 'error');
             return;
         }
     } else if (type === 'turbo') {
-        if (gameState.balance >= 50) {
+        if ((gameState.balance || 0) >= 50) {
             gameState.balance -= 50;
             activateTurbo();
         } else {
@@ -1054,7 +1104,7 @@ function renderSkins() {
     ];
     
     grid.innerHTML = skins.map(s => {
-        const owned = gameState.ownedSkins.includes(s.id);
+        const owned = gameState.ownedSkins && gameState.ownedSkins.includes(s.id);
         return `
             <div class="skin-card" data-skin="${s.id}" data-price="${s.price}">
                 <div class="skin-preview skin-${s.id}"></div>
@@ -1072,15 +1122,16 @@ function renderSkins() {
             if (e.target.tagName === 'BUTTON') return;
             
             const id = card.dataset.skin;
-            const price = parseInt(card.dataset.price);
+            const price = parseInt(card.dataset.price) || 0;
             
-            if (gameState.ownedSkins.includes(id)) {
+            if (gameState.ownedSkins && gameState.ownedSkins.includes(id)) {
                 gameState.skin = id;
                 document.getElementById('clickBtn').className = `clicker skin-${id}`;
                 renderSkins();
                 showNotif('🎨 Скин надет!');
-            } else if (gameState.balance >= price) {
+            } else if ((gameState.balance || 0) >= price) {
                 gameState.balance -= price;
+                if (!gameState.ownedSkins) gameState.ownedSkins = ['red'];
                 gameState.ownedSkins.push(id);
                 gameState.skin = id;
                 renderSkins();
@@ -1149,17 +1200,17 @@ window.openCase = function(type) {
         else reward = 5000;
     }
     
-    if (gameState.balance < price) {
+    if ((gameState.balance || 0) < price) {
         showNotif('❌ Недостаточно', `Нужно ${price}💰`, 'error');
         return;
     }
     
     showCaseAnimation(type, () => {
         gameState.balance -= price;
-        gameState.casesOpened++;
+        gameState.casesOpened = (gameState.casesOpened || 0) + 1;
         gameState.balance += reward;
         
-        if (reward > gameState.bestCaseWin) {
+        if (reward > (gameState.bestCaseWin || 0)) {
             gameState.bestCaseWin = reward;
         }
         
@@ -1254,7 +1305,7 @@ function startLoop() {
     setInterval(() => {
         if (!gameState.nickname) return;
         
-        if (gameState.turbo.active && gameState.turbo.timeLeft > 0) {
+        if (gameState.turbo && gameState.turbo.active && (gameState.turbo.timeLeft || 0) > 0) {
             gameState.turbo.timeLeft--;
             if (gameState.turbo.timeLeft <= 0) {
                 gameState.turbo.active = false;
@@ -1262,14 +1313,14 @@ function startLoop() {
             }
         }
         
-        if (gameState.autoClicker.enabled && gameState.autoClicker.timeLeft > 0) {
+        if (gameState.autoClicker && gameState.autoClicker.enabled && (gameState.autoClicker.timeLeft || 0) > 0) {
             gameState.autoClicker.timeLeft--;
             
-            const multiplier = gameState.turbo.active ? gameState.turbo.multiplier : 1;
-            const gain = gameState.autoClicker.level * gameState.power * multiplier;
+            const multiplier = (gameState.turbo && gameState.turbo.active) ? (gameState.turbo.multiplier || 2) : 1;
+            const gain = (gameState.autoClicker.level || 1) * (gameState.power || 1) * multiplier;
             
-            gameState.balance += gain;
-            gameState.totalEarned += gain;
+            gameState.balance = (gameState.balance || 0) + gain;
+            gameState.totalEarned = (gameState.totalEarned || 0) + gain;
             
             if (gameState.autoClicker.timeLeft <= 0) {
                 gameState.autoClicker.enabled = false;
@@ -1282,7 +1333,7 @@ function startLoop() {
     }, 1000);
     
     setInterval(() => {
-        if (gameState.autoClicker.enabled) updateAutoMenu();
+        if (gameState.autoClicker && gameState.autoClicker.enabled) updateAutoMenu();
         updateTurboUI();
     }, 500);
     
@@ -1291,23 +1342,23 @@ function startLoop() {
 
 // ========== ОБНОВЛЕНИЕ UI ==========
 function updateUI() {
-    document.getElementById('balance').textContent = formatNumber(gameState.balance);
-    document.getElementById('power').textContent = formatNumber(gameState.power);
-    document.getElementById('cps').textContent = formatNumber(gameState.autoclickers);
+    document.getElementById('balance').textContent = formatNumber(gameState.balance || 0);
+    document.getElementById('power').textContent = formatNumber(gameState.power || 1);
+    document.getElementById('cps').textContent = formatNumber(gameState.autoclickers || 0);
     
-    document.getElementById('totalClicks').textContent = formatNumber(gameState.totalClicks);
-    document.getElementById('totalEarned').textContent = formatNumber(gameState.totalEarned);
-    document.getElementById('totalCases').textContent = formatNumber(gameState.casesOpened);
-    document.getElementById('bestWin').textContent = formatNumber(gameState.bestCaseWin) + '💰';
-    document.getElementById('totalDays').textContent = formatNumber(gameState.daysActive);
+    document.getElementById('totalClicks').textContent = formatNumber(gameState.totalClicks || 0);
+    document.getElementById('totalEarned').textContent = formatNumber(gameState.totalEarned || 0);
+    document.getElementById('totalCases').textContent = formatNumber(gameState.casesOpened || 0);
+    document.getElementById('bestWin').textContent = formatNumber(gameState.bestCaseWin || 0) + '💰';
+    document.getElementById('totalDays').textContent = formatNumber(gameState.daysActive || 1);
     
-    const lvl = Math.floor(gameState.totalClicks / 100) + 1;
+    const lvl = Math.floor((gameState.totalClicks || 0) / 100) + 1;
     document.getElementById('playerLevel').textContent = `Уровень ${lvl}`;
     document.getElementById('profileLevel').textContent = `Уровень ${lvl}`;
     
     updateGiftTimer();
     
-    if (gameState.settings.autoSave && gameState.nickname) {
+    if (gameState.settings && gameState.settings.autoSave && gameState.nickname) {
         saveGame();
     }
 }
