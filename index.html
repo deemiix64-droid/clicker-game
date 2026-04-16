@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CLICKER 6.5</title>
+    <title>CLICKER 7.1</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
@@ -16,10 +16,11 @@
     <div class="modal" id="authModal">
         <div class="modal-content">
             <h2 class="gradient-text">🔐 Вход в игру</h2>
+            <div class="device-info" id="deviceInfo"></div>
             <input type="text" id="loginInput" placeholder="Ваш ник" maxlength="20">
             <p class="hint" id="nicknameHint">🔍 Введите ник (мин. 3 символа)</p>
             <div class="modal-buttons">
-                <button class="btn-primary" id="loginBtn">Войти</button>
+                <button class="btn-primary" id="loginBtn">Создать / Войти</button>
                 <button class="btn-secondary" id="loadGameFile">📂 Загрузить .click</button>
             </div>
         </div>
@@ -35,10 +36,13 @@
                 <div class="player-info">
                     <div class="player-name" id="playerName">Игрок</div>
                     <div class="player-level" id="playerLevel">Уровень 1</div>
+                    <div class="player-badge" id="playerBadge"></div>
+                    <div class="player-clan" id="playerClan"></div>
                 </div>
             </div>
             <div class="header-buttons">
                 <button class="icon-btn" id="themeToggle">🌙</button>
+                <button class="icon-btn" id="adminBtn" style="display: none;">👑</button>
                 <button class="icon-btn" id="menuToggle">☰</button>
             </div>
         </div>
@@ -51,11 +55,14 @@
             </div>
             <div class="menu-items">
                 <button class="menu-item active" data-tab="profile">👤 Профиль</button>
+                <button class="menu-item" data-tab="friends">👥 Друзья</button>
+                <button class="menu-item" data-tab="clans">🏰 Кланы</button>
                 <button class="menu-item" data-tab="shop">🏪 Магазин</button>
                 <button class="menu-item" data-tab="skins">🎨 Скины</button>
                 <button class="menu-item" data-tab="cases">🎁 Кейсы</button>
                 <button class="menu-item" data-tab="promo">🎫 Промокоды</button>
                 <button class="menu-item" data-tab="leaders">🏆 Лидеры</button>
+                <button class="menu-item" data-tab="admin" id="adminMenuItem" style="display: none;">👑 Админ панель</button>
                 <button class="menu-item" data-tab="settings">⚙️ Настройки</button>
             </div>
             <div class="menu-footer">
@@ -119,6 +126,8 @@
                     <div class="profile-info">
                         <div class="profile-name" id="profileName">Игрок</div>
                         <div class="profile-level" id="profileLevel">Уровень 1</div>
+                        <div class="profile-badge" id="profileBadge"></div>
+                        <div class="profile-clan" id="profileClan"></div>
                     </div>
                 </div>
                 
@@ -147,6 +156,81 @@
 
                 <!-- БЛОК ТИТУЛОВ -->
                 <div class="profile-titles" id="profileTitles"></div>
+            </div>
+
+            <!-- ДРУЗЬЯ (НОВАЯ ВКЛАДКА) -->
+            <div class="tab" id="friends">
+                <div class="friends-header">
+                    <h3>👥 Друзья</h3>
+                    <button class="btn-add" id="addFriendBtn">➕ Добавить друга</button>
+                </div>
+
+                <div class="friends-tabs">
+                    <button class="friends-tab active" data-friends="all">Все</button>
+                    <button class="friends-tab" data-friends="online">Онлайн</button>
+                    <button class="friends-tab" data-friends="requests">Заявки</button>
+                </div>
+
+                <div class="friends-list" id="friendsList"></div>
+
+                <!-- Модалка добавления друга -->
+                <div class="modal-small" id="addFriendModal" style="display: none;">
+                    <div class="modal-small-content">
+                        <h4>Добавить друга</h4>
+                        <input type="text" id="friendNameInput" placeholder="Введите ник друга">
+                        <div class="modal-small-actions">
+                            <button class="btn-primary" id="sendFriendRequest">Отправить</button>
+                            <button class="btn-secondary" id="closeAddFriend">Отмена</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- КЛАНЫ (НОВАЯ ВКЛАДКА) -->
+            <div class="tab" id="clans">
+                <div class="clans-header">
+                    <h3>🏰 Кланы</h3>
+                    <button class="btn-add" id="createClanBtn">➕ Создать клан</button>
+                </div>
+
+                <div class="my-clan-section" id="myClanSection" style="display: none;">
+                    <h4>Мой клан</h4>
+                    <div class="clan-card my-clan" id="myClanCard"></div>
+                </div>
+
+                <div class="clans-search">
+                    <input type="text" id="clanSearchInput" placeholder="🔍 Поиск кланов...">
+                </div>
+
+                <div class="clans-list" id="clansList"></div>
+
+                <!-- Модалка создания клана -->
+                <div class="modal-small" id="createClanModal" style="display: none;">
+                    <div class="modal-small-content">
+                        <h4>Создать клан</h4>
+                        <input type="text" id="clanNameInput" placeholder="Название клана" maxlength="20">
+                        <select id="clanTypeSelect">
+                            <option value="public">🔓 Публичный</option>
+                            <option value="private">🔒 Приватный</option>
+                        </select>
+                        <div class="modal-small-actions">
+                            <button class="btn-primary" id="confirmCreateClan">Создать (500💰)</button>
+                            <button class="btn-secondary" id="closeCreateClan">Отмена</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модалка вступления в клан -->
+                <div class="modal-small" id="joinClanModal" style="display: none;">
+                    <div class="modal-small-content">
+                        <h4>Вступить в клан</h4>
+                        <p id="joinClanInfo"></p>
+                        <div class="modal-small-actions">
+                            <button class="btn-primary" id="confirmJoinClan">Вступить</button>
+                            <button class="btn-secondary" id="closeJoinClan">Отмена</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- МАГАЗИН -->
@@ -181,6 +265,65 @@
             <div class="tab" id="leaders">
                 <h3>🏆 Таблица лидеров</h3>
                 <div class="leaderboard" id="leaderboard"></div>
+            </div>
+
+            <!-- АДМИН ПАНЕЛЬ -->
+            <div class="tab" id="admin">
+                <h3>👑 Админ панель</h3>
+                
+                <div class="admin-section">
+                    <h4>Выдача ресурсов</h4>
+                    <div class="admin-form">
+                        <input type="text" id="adminPlayerName" placeholder="Ник игрока">
+                        <input type="number" id="adminClicks" placeholder="Клики">
+                        <input type="number" id="adminMoney" placeholder="Монеты">
+                        <select id="adminRole">
+                            <option value="">Выдать роль</option>
+                            <option value="vip">👑 VIP</option>
+                            <option value="content">🎬 Content Maker</option>
+                        </select>
+                        <button class="btn-primary" id="adminGive">Выдать</button>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h4>Управление промокодами</h4>
+                    <div class="admin-form">
+                        <input type="text" id="promoCodeName" placeholder="Название промокода">
+                        <select id="promoRewardType">
+                            <option value="money">Монеты</option>
+                            <option value="clicks">Клики</option>
+                            <option value="vip">VIP статус</option>
+                            <option value="turbo">Турбо</option>
+                        </select>
+                        <input type="number" id="promoRewardValue" placeholder="Количество">
+                        <button class="btn-primary" id="adminAddPromo">➕ Создать промокод</button>
+                    </div>
+                    <div class="promo-list admin" id="adminPromoList"></div>
+                </div>
+
+                <div class="admin-section">
+                    <h4>События</h4>
+                    <div class="admin-form">
+                        <input type="text" id="eventName" placeholder="Название события">
+                        <select id="eventType">
+                            <option value="double">x2 доход</option>
+                            <option value="discount">Скидка 50%</option>
+                            <option value="free">Бесплатные кейсы</option>
+                        </select>
+                        <input type="datetime-local" id="eventEndTime">
+                        <button class="btn-primary" id="adminAddEvent">🎉 Создать событие</button>
+                    </div>
+                    <div class="events-list" id="adminEventsList"></div>
+                </div>
+
+                <div class="admin-section">
+                    <h4>Игроки</h4>
+                    <div class="players-search">
+                        <input type="text" id="playersSearch" placeholder="Поиск игрока...">
+                    </div>
+                    <div class="players-list" id="adminPlayersList"></div>
+                </div>
             </div>
 
             <!-- НАСТРОЙКИ -->
@@ -287,6 +430,7 @@
     <!-- УВЕДОМЛЕНИЯ -->
     <div class="notifications" id="notifications"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="script.js"></script>
 </body>
-                    </html>
+</html>
