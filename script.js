@@ -1,7 +1,8 @@
 // ========== СОСТОЯНИЕ ИГРЫ ==========
 let gameState = {
     nickname: '',
-    balance: 0,
+    deviceId: '',
+    balance: 1000,
     totalClicks: 0,
     totalEarned: 0,
     autoclickers: 0,
@@ -13,7 +14,11 @@ let gameState = {
     ownedSkins: ['red'],
     title: '👆 Новичок',
     titles: ['👆 Новичок'],
+    role: '',
     friends: [],
+    friendRequests: [],
+    clan: null,
+    clanRequests: [],
     lastDaily: null,
     lastGift: null,
     usedCodes: [],
@@ -35,21 +40,781 @@ let gameState = {
         maxTime: 30,
         multiplier: 2
     },
-    version: '6.6'
+    version: '7.1'
 };
 
-// ========== БАЗА ДАННЫХ ИГРОКОВ ==========
+// ========== ГЛОБАЛЬНЫЕ БАЗЫ ДАННЫХ ==========
 let playersDB = [];
 let leaderboardDB = [];
+let clansDB = [];
+let customPromoCodes = [];
+let events = [];
 
-// Загрузка базы игроков
+// ========== ЗАГРУЗКА БАЗ ДАННЫХ ==========
+function loadClansDB() {
+    const saved = localStorage.getItem('clans_db');
+    if (saved) {
+        try {
+            clansDB = JSON.parse(saved);
+        } catch (e) {
+            clansDB = [];
+        }
+    } else {
+        clansDB = [];
+    }
+}
+
+function saveClansDB() {
+    localStorage.setItem('clans_db', JSON.stringify(clansDB));
+}
+
+// ========== СИСТЕМА ДРУЗЕЙ ==========
+function sendFriendRequest(friendName) {
+    if (friendName === gameState.nickname) {
+        showNotif('❌ Ошибка', 'Нельзя добавить себя в друзья', 'error');
+        return false;
+    }
+    
+    const friend = playersDB.find(p => p.name === friendName);
+    if (!friend) {
+        showNotif('❌ Ошибка', 'Игрок не найден', 'error');
+        return false;
+    }
+    
+    if (gameState.friends.includes(friendName)) {
+        showNotif('❌ Ошибка', 'Уже в друзьях', 'error');
+        return false;
+    }
+    
+    if (!friend.friendRequests) friend.friendRequests = [];
+    if (friend.friendRequests.includes(gameState.nickname)) {
+        showNotif('❌ Ошибка', 'Заявка уже отправлена', 'error');
+        return false;
+    }
+    
+    friend.friendRequests.push(gameState.nickname);
+    savePlayersDB();
+    showNotif('✅ Заявка отправлена', `Приглашение для ${friendName}`, 'success');
+    return true;
+}
+
+function acceptFriendRequest(friendName) {
+    const index = gameState.friendRequests.indexOf(friendName);
+    if (index === -1) return;
+    
+    gameState.friendRequests.splice(index, 1);
+    if (!gameState.friends) gameState.friends = [];
+    gameState.friends.push(friendName);
+    
+    // Добавляем в друзья и другому игроку
+    const friend = playersDB.find(p => p.name === friendName);
+    if (friend) {
+        if (!friend.friends) friend.friends = [];
+        if (!friend.friends.includes(gameState.nickname)) {
+            friend.friends.push(gameState.nickname);
+        }
+        // Удаляем заявку
+        const reqIndex = friend.friendRequests.indexOf(gameState.nickname);
+        if (reqIndex !== -1) friend.friendRequests.splice(reqIndex, 1);
+        savePlayersDB();
+    }
+    
+    showNotif('✅ Друг добавлен', friendName, 'success');
+    renderFriends();
+    saveGame();
+}
+
+function declineFriendRequest(friendName) {
+    const index = gameState.friendRequests.indexOf(friendName);
+    if (index !== -1) {
+        gameState.friendRequests.splice(index, 1);
+        showNotif('❌ Заявка отклонена', friendName, 'info');
+        renderFriends();
+        saveGame();
+    }
+}
+
+function removeFriend(friendName) {
+    const index = gameState.friends.indexOf(friendName);
+    if (index !== -1) {
+        gameState.friends.splice(index, 1);
+        
+        // Удаляем из друзей другого игрока
+        const friend = playersDB.find(p => p.name === friendName);
+        if (friend && friend.friends) {
+            const friendIndex = friend.friends.indexOf(gameState.nickname);
+            if (friendIndex !== -1) friend.friends.splice(friendIndex, 1);
+            savePlayersDB();
+        }
+        
+        showNotif('❌ Друг удален', friendName, 'info');
+        renderFriends();
+        saveGame();
+    }
+}
+
+function renderFriends() {
+    const container = document.getElementById('friendsList');
+    const activeTab = document.querySelector('.friends-tab.active').dataset.friends;
+    
+    if (!container) return;
+    
+    if (activeTab === 'requests') {
+        if (!gameState.friendRequests || gameState.friendRequests.length === 0) {
+            container.innerHTML = '<div class="friend-placeholder">Нет входящих заявок</div>';
+            return;
+        }
+        
+        container.innerHTML = gameState.friendRequests.map(friend => `
+            <div class="friend-request-card">
+                <div class="friend-info">
+                    <div class="friend-avatar">👤</div>
+                    <div class="friend-details">
+                        <div class="friend-name">${friend}</div>
+                    </div>
+                </div>
+                <div class="request-actions">
+                    <button class="request-accept" onclick="acceptFriendRequest('${friend}')">✅</button>
+                    <button class="request-decline" onclick="declineFriendRequest('${friend}')">❌</button>
+                </div>
+            </div>
+        `).join('');
+        return;
+    }
+    
+    let friends = gameState.friends || [];
+    
+    if (activeTab === 'online') {
+        // Проверяем онлайн статус (по последнему входу)
+        friends = friends.filter(f => {
+            const player = playersDB.find(p => p.name === f);
+            return player && (Date.now() - (player.lastSeen || 0) < 5 * 60 * 1000);
+        });
+    }
+    
+    if (friends.length === 0) {
+        container.innerHTML = '<div class="friend-placeholder">У вас пока нет друзей</div>';
+        return;
+    }
+    
+    container.innerHTML = friends.map(friend => {
+        const player = playersDB.find(p => p.name === friend);
+        const isOnline = player && (Date.now() - (player.lastSeen || 0) < 5 * 60 * 1000);
+        const level = player ? Math.floor((player.totalClicks || 0) / 100) + 1 : 1;
+        
+        return `
+            <div class="friend-card">
+                <div class="friend-info">
+                    <div class="friend-avatar">👤</div>
+                    <div class="friend-details">
+                        <div class="friend-name">${friend}</div>
+                        <div class="friend-status ${isOnline ? 'online' : ''}">
+                            ${isOnline ? '🟢 Онлайн' : '⚫ Офлайн'} • Ур.${level}
+                        </div>
+                    </div>
+                </div>
+                <div class="friend-actions">
+                    <button class="friend-action" onclick="viewPlayerProfile('${friend}')">👁️</button>
+                    <button class="friend-action" onclick="sendGift('${friend}')">🎁</button>
+                    <button class="friend-action" onclick="removeFriend('${friend}')">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function sendGift(friendName) {
+    if (gameState.balance >= 100) {
+        gameState.balance -= 100;
+        showNotif('🎁 Подарок отправлен!', `${friendName} получил 100💰`, 'success');
+        saveGame();
+        updateUI();
+    } else {
+        showNotif('❌ Недостаточно', 'Нужно 100💰', 'error');
+    }
+}
+
+// ========== СИСТЕМА КЛАНОВ ==========
+function createClan(clanName, type) {
+    if (gameState.clan) {
+        showNotif('❌ Ошибка', 'Вы уже в клане', 'error');
+        return false;
+    }
+    
+    const price = 500;
+    if (gameState.balance < price) {
+        showNotif('❌ Недостаточно', `Нужно ${price}💰`, 'error');
+        return false;
+    }
+    
+    if (clansDB.some(c => c.name.toLowerCase() === clanName.toLowerCase())) {
+        showNotif('❌ Ошибка', 'Клан с таким названием уже существует', 'error');
+        return false;
+    }
+    
+    gameState.balance -= price;
+    
+    const newClan = {
+        id: Date.now().toString(),
+        name: clanName,
+        icon: '🏰',
+        owner: gameState.nickname,
+        members: [gameState.nickname],
+        level: 1,
+        balance: 0,
+        type: type,
+        requests: [],
+        created: Date.now(),
+        xp: 0
+    };
+    
+    clansDB.push(newClan);
+    gameState.clan = {
+        id: newClan.id,
+        name: newClan.name,
+        icon: newClan.icon,
+        owner: newClan.owner,
+        members: newClan.members,
+        level: newClan.level,
+        balance: newClan.balance
+    };
+    
+    saveClansDB();
+    saveGame();
+    showNotif('🏰 Клан создан!', clanName, 'success');
+    renderClans();
+    updateClanUI();
+    return true;
+}
+
+function sendClanRequest(clanId) {
+    if (gameState.clan) {
+        showNotif('❌ Ошибка', 'Вы уже в клане', 'error');
+        return;
+    }
+    
+    const clan = clansDB.find(c => c.id === clanId);
+    if (!clan) return;
+    
+    if (clan.type === 'public') {
+        joinClan(clanId);
+    } else {
+        if (!clan.requests) clan.requests = [];
+        if (clan.requests.includes(gameState.nickname)) {
+            showNotif('❌ Ошибка', 'Заявка уже отправлена', 'error');
+            return;
+        }
+        
+        clan.requests.push(gameState.nickname);
+        saveClansDB();
+        showNotif('✅ Заявка отправлена', `В клан ${clan.name}`, 'success');
+        renderClans();
+    }
+}
+
+function joinClan(clanId) {
+    const clan = clansDB.find(c => c.id === clanId);
+    if (!clan) return;
+    
+    if (gameState.clan) {
+        showNotif('❌ Ошибка', 'Вы уже в клане', 'error');
+        return;
+    }
+    
+    if (!clan.members) clan.members = [];
+    clan.members.push(gameState.nickname);
+    
+    // Удаляем заявку если была
+    if (clan.requests) {
+        const reqIndex = clan.requests.indexOf(gameState.nickname);
+        if (reqIndex !== -1) clan.requests.splice(reqIndex, 1);
+    }
+    
+    gameState.clan = {
+        id: clan.id,
+        name: clan.name,
+        icon: clan.icon,
+        owner: clan.owner,
+        members: clan.members,
+        level: clan.level,
+        balance: clan.balance
+    };
+    
+    saveClansDB();
+    saveGame();
+    showNotif('✅ Вы вступили в клан!', clan.name, 'success');
+    renderClans();
+    updateClanUI();
+}
+
+function leaveClan() {
+    if (!gameState.clan) return;
+    
+    const clan = clansDB.find(c => c.id === gameState.clan.id);
+    if (clan) {
+        clan.members = clan.members.filter(m => m !== gameState.nickname);
+        
+        // Если клан опустел - удаляем
+        if (clan.members.length === 0) {
+            const index = clansDB.findIndex(c => c.id === clan.id);
+            if (index !== -1) clansDB.splice(index, 1);
+        }
+        
+        saveClansDB();
+    }
+    
+    gameState.clan = null;
+    saveGame();
+    showNotif('🚪 Вы покинули клан', '', 'info');
+    renderClans();
+    updateClanUI();
+}
+
+function kickFromClan(memberName) {
+    if (!gameState.clan) return;
+    if (gameState.clan.owner !== gameState.nickname) {
+        showNotif('❌ Ошибка', 'Только владелец клана может кикать', 'error');
+        return;
+    }
+    
+    const clan = clansDB.find(c => c.id === gameState.clan.id);
+    if (clan) {
+        clan.members = clan.members.filter(m => m !== memberName);
+        saveClansDB();
+        
+        // Обновляем у игрока
+        const player = playersDB.find(p => p.name === memberName);
+        if (player) {
+            player.clan = null;
+            savePlayersDB();
+        }
+        
+        // Обновляем у текущего игрока
+        gameState.clan.members = clan.members;
+        
+        showNotif('👢 Игрок исключен', memberName, 'warning');
+        renderClans();
+        updateClanUI();
+    }
+}
+
+function upgradeClan() {
+    if (!gameState.clan) return;
+    if (gameState.clan.owner !== gameState.nickname) {
+        showNotif('❌ Ошибка', 'Только владелец клана может улучшать', 'error');
+        return;
+    }
+    
+    const price = 1000 * (gameState.clan.level || 1);
+    if (gameState.balance >= price) {
+        gameState.balance -= price;
+        
+        const clan = clansDB.find(c => c.id === gameState.clan.id);
+        if (clan) {
+            clan.level = (clan.level || 1) + 1;
+            clan.balance = (clan.balance || 0) + price;
+            saveClansDB();
+            
+            gameState.clan.level = clan.level;
+            gameState.clan.balance = clan.balance;
+            
+            showNotif('⬆️ Клан улучшен!', `Уровень ${clan.level}`, 'success');
+            renderClans();
+            updateClanUI();
+            updateUI();
+            saveGame();
+        }
+    } else {
+        showNotif('❌ Недостаточно', `Нужно ${price}💰`, 'error');
+    }
+}
+
+function renderClans() {
+    const container = document.getElementById('clansList');
+    const myClanSection = document.getElementById('myClanSection');
+    const myClanCard = document.getElementById('myClanCard');
+    
+    if (!container) return;
+    
+    // Показываем клан игрока
+    if (gameState.clan) {
+        myClanSection.style.display = 'block';
+        
+        const level = gameState.clan.level || 1;
+        const memberCount = gameState.clan.members?.length || 1;
+        
+        myClanCard.innerHTML = `
+            <div class="clan-header">
+                <span class="clan-icon">${gameState.clan.icon || '🏰'}</span>
+                <span class="clan-name">${gameState.clan.name}</span>
+                <span class="clan-level">Ур.${level}</span>
+            </div>
+            <div class="clan-stats">
+                <span>👥 ${memberCount}/20</span>
+                <span>💰 ${formatNumber(gameState.clan.balance || 0)}</span>
+                <span>🏆 ${formatNumber(gameState.clan.xp || 0)} XP</span>
+            </div>
+            <div class="clan-members" id="clanMembersList">
+                ${(gameState.clan.members || []).map(m => `
+                    <div class="clan-member">
+                        <div class="clan-member-avatar">👤</div>
+                        <span class="clan-member-name">${m}</span>
+                        <span class="clan-member-role">
+                            ${m === gameState.clan.owner ? '👑 Владелец' : ''}
+                        </span>
+                        ${gameState.clan.owner === gameState.nickname && m !== gameState.nickname ? `
+                            <button class="clan-action" onclick="kickFromClan('${m}')">🚪</button>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+            <div class="clan-actions">
+                ${gameState.clan.owner === gameState.nickname ? `
+                    <button class="clan-action" onclick="upgradeClan()">⬆️ Улучшить (${1000 * (gameState.clan.level || 1)}💰)</button>
+                    <button class="clan-action invite" id="inviteToClanBtn">📨 Пригласить</button>
+                ` : ''}
+                <button class="clan-action leave" onclick="leaveClan()">🚪 Покинуть клан</button>
+            </div>
+        `;
+        
+        // Кнопка приглашения
+        document.getElementById('inviteToClanBtn')?.addEventListener('click', () => {
+            const friendName = prompt('Введите ник друга для приглашения:');
+            if (friendName) {
+                const friend = playersDB.find(p => p.name === friendName);
+                if (friend && gameState.friends.includes(friendName)) {
+                    sendClanInvite(friendName);
+                } else {
+                    showNotif('❌ Ошибка', 'Друг не найден', 'error');
+                }
+            }
+        });
+        
+    } else {
+        myClanSection.style.display = 'none';
+    }
+    
+    // Список доступных кланов
+    const search = document.getElementById('clanSearchInput')?.value.toLowerCase() || '';
+    let clans = clansDB.filter(c => c.name.toLowerCase().includes(search));
+    
+    if (clans.length === 0) {
+        container.innerHTML = '<div class="clan-placeholder">Нет доступных кланов</div>';
+        return;
+    }
+    
+    container.innerHTML = clans.map(clan => {
+        const hasRequest = clan.requests?.includes(gameState.nickname);
+        const isMember = clan.members?.includes(gameState.nickname);
+        
+        return `
+            <div class="clan-list-card">
+                <div class="clan-list-header">
+                    <span class="clan-icon">${clan.icon || '🏰'}</span>
+                    <span class="clan-list-name">${clan.name}</span>
+                    <span class="clan-level">Ур.${clan.level || 1}</span>
+                </div>
+                <div class="clan-list-stats">
+                    <span>👥 ${clan.members?.length || 1}/20</span>
+                    <span>💰 ${formatNumber(clan.balance || 0)}</span>
+                    <span>${clan.type === 'public' ? '🔓 Публичный' : '🔒 Приватный'}</span>
+                </div>
+                ${!isMember ? `
+                    <button class="clan-join-btn ${hasRequest ? 'requested' : ''}" 
+                            onclick="sendClanRequest('${clan.id}')"
+                            ${hasRequest ? 'disabled' : ''}>
+                        ${hasRequest ? '⏳ Заявка отправлена' : '📝 Вступить'}
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function sendClanInvite(friendName) {
+    if (!gameState.clan) return;
+    
+    const friend = playersDB.find(p => p.name === friendName);
+    if (friend && friend.friends?.includes(gameState.nickname)) {
+        if (!friend.clanRequests) friend.clanRequests = [];
+        friend.clanRequests.push({
+            clanId: gameState.clan.id,
+            clanName: gameState.clan.name,
+            from: gameState.nickname
+        });
+        savePlayersDB();
+        showNotif('✅ Приглашение отправлено', friendName, 'success');
+    }
+}
+
+function updateClanUI() {
+    if (gameState.clan) {
+        document.getElementById('playerClan').innerHTML = `🏰 ${gameState.clan.name}`;
+        document.getElementById('profileClan').innerHTML = `🏰 Клан: ${gameState.clan.name}`;
+    } else {
+        document.getElementById('playerClan').innerHTML = '';
+        document.getElementById('profileClan').innerHTML = '';
+    }
+}
+
+// ========== АДМИН ПАНЕЛЬ ==========
+const ADMIN_NICKNAME = 'Admin';
+
+function isAdmin() {
+    return gameState.nickname === ADMIN_NICKNAME;
+}
+
+function updateAdminVisibility() {
+    const adminBtn = document.getElementById('adminBtn');
+    const adminMenuItem = document.getElementById('adminMenuItem');
+    const isAdminUser = isAdmin();
+    
+    if (adminBtn) adminBtn.style.display = isAdminUser ? 'flex' : 'none';
+    if (adminMenuItem) adminMenuItem.style.display = isAdminUser ? 'block' : 'none';
+}
+
+function adminGiveResources() {
+    const playerName = document.getElementById('adminPlayerName').value.trim();
+    const clicks = parseInt(document.getElementById('adminClicks').value) || 0;
+    const money = parseInt(document.getElementById('adminMoney').value) || 0;
+    const role = document.getElementById('adminRole').value;
+    
+    if (!playerName) {
+        showNotif('❌ Ошибка', 'Введите ник игрока', 'error');
+        return;
+    }
+    
+    const player = playersDB.find(p => p.name === playerName);
+    if (!player) {
+        showNotif('❌ Ошибка', 'Игрок не найден', 'error');
+        return;
+    }
+    
+    if (clicks > 0) player.totalClicks = (player.totalClicks || 0) + clicks;
+    if (money > 0) player.balance = (player.balance || 0) + money;
+    if (role) {
+        player.role = role;
+        if (playerName === gameState.nickname) {
+            gameState.role = role;
+            updateRoleUI();
+        }
+    }
+    
+    savePlayersDB();
+    showNotif('✅ Успешно', `Выдано ${money}💰 и ${clicks} кликов`, 'success');
+    
+    document.getElementById('adminClicks').value = '';
+    document.getElementById('adminMoney').value = '';
+    document.getElementById('adminRole').value = '';
+}
+
+function adminAddPromo() {
+    const code = document.getElementById('promoCodeName').value.trim().toUpperCase();
+    const rewardType = document.getElementById('promoRewardType').value;
+    const rewardValue = parseInt(document.getElementById('promoRewardValue').value) || 0;
+    
+    if (!code) {
+        showNotif('❌ Ошибка', 'Введите название промокода', 'error');
+        return;
+    }
+    
+    if (rewardValue <= 0 && rewardType !== 'vip' && rewardType !== 'turbo') {
+        showNotif('❌ Ошибка', 'Введите количество', 'error');
+        return;
+    }
+    
+    customPromoCodes.push({
+        code: code,
+        type: rewardType,
+        value: rewardValue,
+        created: Date.now(),
+        uses: 0
+    });
+    
+    saveCustomPromoCodes();
+    renderAdminPromoList();
+    renderPromoList();
+    
+    showNotif('✅ Промокод создан', code, 'success');
+    
+    document.getElementById('promoCodeName').value = '';
+    document.getElementById('promoRewardValue').value = '';
+}
+
+function deletePromoCode(code) {
+    customPromoCodes = customPromoCodes.filter(p => p.code !== code);
+    saveCustomPromoCodes();
+    renderAdminPromoList();
+    renderPromoList();
+    showNotif('✅ Промокод удален', code, 'success');
+}
+
+function adminAddEvent() {
+    const name = document.getElementById('eventName').value.trim();
+    const type = document.getElementById('eventType').value;
+    const endTime = document.getElementById('eventEndTime').value;
+    
+    if (!name) {
+        showNotif('❌ Ошибка', 'Введите название события', 'error');
+        return;
+    }
+    
+    if (!endTime) {
+        showNotif('❌ Ошибка', 'Выберите время окончания', 'error');
+        return;
+    }
+    
+    events.push({
+        name: name,
+        type: type,
+        endTime: new Date(endTime).getTime(),
+        active: true,
+        created: Date.now()
+    });
+    
+    saveEvents();
+    renderAdminEventsList();
+    
+    showNotif('✅ Событие создано', name, 'success');
+    
+    document.getElementById('eventName').value = '';
+    document.getElementById('eventEndTime').value = '';
+}
+
+function deleteEvent(index) {
+    events.splice(index, 1);
+    saveEvents();
+    renderAdminEventsList();
+    showNotif('✅ Событие удалено', '', 'success');
+}
+
+function saveCustomPromoCodes() {
+    localStorage.setItem('custom_promocodes', JSON.stringify(customPromoCodes));
+}
+
+function loadCustomPromoCodes() {
+    const saved = localStorage.getItem('custom_promocodes');
+    if (saved) {
+        try {
+            customPromoCodes = JSON.parse(saved);
+        } catch (e) {
+            customPromoCodes = [];
+        }
+    }
+}
+
+function saveEvents() {
+    localStorage.setItem('events', JSON.stringify(events));
+}
+
+function loadEvents() {
+    const saved = localStorage.getItem('events');
+    if (saved) {
+        try {
+            events = JSON.parse(saved);
+            const now = Date.now();
+            events.forEach(e => {
+                if (e.endTime && e.endTime <= now) {
+                    e.active = false;
+                }
+            });
+        } catch (e) {
+            events = [];
+        }
+    }
+}
+
+function renderAdminPromoList() {
+    const container = document.getElementById('adminPromoList');
+    if (!container) return;
+    
+    if (customPromoCodes.length === 0) {
+        container.innerHTML = '<div class="promo-item">Нет созданных промокодов</div>';
+        return;
+    }
+    
+    container.innerHTML = customPromoCodes.map(promo => `
+        <div class="promo-item">
+            <span><strong>${promo.code}</strong> - ${promo.type === 'money' ? promo.value + '💰' : promo.type === 'clicks' ? promo.value + ' кликов' : promo.type === 'vip' ? 'VIP статус' : 'Турбо'}</span>
+            <button onclick="deletePromoCode('${promo.code}')">🗑️</button>
+        </div>
+    `).join('');
+}
+
+function renderAdminEventsList() {
+    const container = document.getElementById('adminEventsList');
+    if (!container) return;
+    
+    if (events.length === 0) {
+        container.innerHTML = '<div class="event-item">Нет активных событий</div>';
+        return;
+    }
+    
+    container.innerHTML = events.map((event, index) => `
+        <div class="event-item">
+            <div>
+                <strong>${event.name}</strong><br>
+                ${event.type === 'double' ? 'x2 доход' : event.type === 'discount' ? 'Скидка 50%' : 'Бесплатные кейсы'}
+                ${event.active ? '🟢 Активно' : '🔴 Завершено'}
+            </div>
+            <button onclick="deleteEvent(${index})">🗑️</button>
+        </div>
+    `).join('');
+}
+
+function renderAdminPlayersList() {
+    const container = document.getElementById('adminPlayersList');
+    if (!container) return;
+    
+    const search = document.getElementById('playersSearch')?.value.toLowerCase() || '';
+    const filtered = playersDB.filter(p => p.name.toLowerCase().includes(search));
+    
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="player-item">Нет игроков</div>';
+        return;
+    }
+    
+    container.innerHTML = filtered.map(player => `
+        <div class="player-item">
+            <div>
+                <span class="player-name">${player.name}</span>
+                <div class="player-badges">
+                    ${player.role === 'vip' ? '<span class="player-badge vip">👑 VIP</span>' : ''}
+                    ${player.role === 'content' ? '<span class="player-badge content">🎬 CM</span>' : ''}
+                </div>
+            </div>
+            <button onclick="viewPlayerProfile('${player.name}')">👁️</button>
+        </div>
+    `).join('');
+}
+
+// ========== УНИКАЛЬНЫЙ ID УСТРОЙСТВА ==========
+function getDeviceId() {
+    let deviceId = localStorage.getItem('device_id');
+    if (!deviceId) {
+        deviceId = CryptoJS.SHA256(
+            navigator.userAgent + 
+            screen.width + 
+            screen.height + 
+            screen.colorDepth +
+            new Date().getTimezoneOffset()
+        ).toString();
+        localStorage.setItem('device_id', deviceId);
+    }
+    return deviceId;
+}
+
+function linkDevice(nickname) {
+    localStorage.setItem('linked_device', getDeviceId());
+    localStorage.setItem('linked_nickname', nickname);
+}
+
+// ========== БАЗА ДАННЫХ ИГРОКОВ ==========
 function loadPlayersDB() {
     const saved = localStorage.getItem('players_db');
     if (saved) {
         try {
             playersDB = JSON.parse(saved);
-            // Фильтруем битые записи
-            playersDB = playersDB.filter(p => p && p.name);
         } catch (e) {
             playersDB = [];
         }
@@ -58,57 +823,90 @@ function loadPlayersDB() {
     }
 }
 
-// Сохранение базы игроков
 function savePlayersDB() {
-    try {
-        localStorage.setItem('players_db', JSON.stringify(playersDB));
-    } catch (e) {
-        console.error('Ошибка сохранения players_db:', e);
-    }
+    localStorage.setItem('players_db', JSON.stringify(playersDB));
+    syncLeaderboard();
 }
 
-// Проверка уникальности ника
+function syncLeaderboard() {
+    leaderboardDB = playersDB.map(p => ({
+        name: p.name,
+        score: p.balance || 0,
+        title: p.title || '👆 Новичок',
+        role: p.role || '',
+        lastUpdate: Date.now()
+    }));
+    
+    leaderboardDB.sort((a, b) => (b.score || 0) - (a.score || 0));
+    if (leaderboardDB.length > 50) leaderboardDB = leaderboardDB.slice(0, 50);
+    
+    localStorage.setItem('leaderboard_db', JSON.stringify(leaderboardDB));
+    renderLeaderboard();
+}
+
 function isNicknameUnique(nickname) {
     if (!nickname) return false;
-    return !playersDB.some(p => p && p.name && p.name.toLowerCase() === nickname.toLowerCase());
+    return !playersDB.some(p => p.name.toLowerCase() === nickname.toLowerCase());
 }
 
-// Регистрация нового игрока
-function registerPlayer(nickname) {
-    if (!nickname) return;
-    
+function registerPlayer(nickname, deviceId) {
     const playerData = {
         name: nickname,
+        deviceId: deviceId,
         registered: Date.now(),
         lastSeen: Date.now(),
-        balance: gameState.balance || 0,
-        totalClicks: gameState.totalClicks || 0,
-        totalEarned: gameState.totalEarned || 0,
-        autoclickers: gameState.autoclickers || 0,
-        power: gameState.power || 1,
-        casesOpened: gameState.casesOpened || 0,
-        bestCaseWin: gameState.bestCaseWin || 0,
-        daysActive: gameState.daysActive || 1,
-        skin: gameState.skin || 'red',
-        ownedSkins: gameState.ownedSkins || ['red'],
-        title: gameState.title || '👆 Новичок',
-        titles: gameState.titles || ['👆 Новичок'],
-        autoClickerLevel: gameState.autoClicker?.level || 1
+        balance: 1000,
+        totalClicks: 0,
+        totalEarned: 0,
+        autoclickers: 0,
+        power: 1,
+        casesOpened: 0,
+        bestCaseWin: 0,
+        daysActive: 1,
+        skin: 'red',
+        ownedSkins: ['red'],
+        title: '👆 Новичок',
+        titles: ['👆 Новичок'],
+        role: '',
+        friends: [],
+        friendRequests: [],
+        clan: null,
+        autoClickerLevel: 1
     };
     
     playersDB.push(playerData);
     savePlayersDB();
+    return playerData;
 }
 
-// Обновление данных игрока
+function loadPlayerData(nickname) {
+    const player = playersDB.find(p => p.name === nickname);
+    if (player) {
+        gameState.balance = player.balance || 0;
+        gameState.totalClicks = player.totalClicks || 0;
+        gameState.totalEarned = player.totalEarned || 0;
+        gameState.autoclickers = player.autoclickers || 0;
+        gameState.power = player.power || 1;
+        gameState.casesOpened = player.casesOpened || 0;
+        gameState.bestCaseWin = player.bestCaseWin || 0;
+        gameState.daysActive = player.daysActive || 1;
+        gameState.skin = player.skin || 'red';
+        gameState.ownedSkins = player.ownedSkins || ['red'];
+        gameState.title = player.title || '👆 Новичок';
+        gameState.titles = player.titles || ['👆 Новичок'];
+        gameState.role = player.role || '';
+        gameState.friends = player.friends || [];
+        gameState.friendRequests = player.friendRequests || [];
+        gameState.clan = player.clan || null;
+        gameState.autoClicker.level = player.autoClickerLevel || 1;
+    }
+}
+
 function updatePlayerData() {
-    if (!gameState.nickname) return;
-    
-    const index = playersDB.findIndex(p => p && p.name === gameState.nickname);
+    const index = playersDB.findIndex(p => p.name === gameState.nickname);
     if (index >= 0) {
         playersDB[index] = {
             ...playersDB[index],
-            name: gameState.nickname,
             lastSeen: Date.now(),
             balance: gameState.balance || 0,
             totalClicks: gameState.totalClicks || 0,
@@ -122,17 +920,20 @@ function updatePlayerData() {
             ownedSkins: gameState.ownedSkins || ['red'],
             title: gameState.title || '👆 Новичок',
             titles: gameState.titles || ['👆 Новичок'],
+            role: gameState.role || '',
+            friends: gameState.friends || [],
+            friendRequests: gameState.friendRequests || [],
+            clan: gameState.clan || null,
             autoClickerLevel: gameState.autoClicker?.level || 1
         };
         savePlayersDB();
+        syncLeaderboard();
     }
 }
 
-// ========== ПРОСМОТР ПРОФИЛЯ ИГРОКА ==========
+// ========== ПРОСМОТР ПРОФИЛЯ ==========
 function viewPlayerProfile(playerName) {
-    if (!playerName) return;
-    
-    const player = playersDB.find(p => p && p.name === playerName);
+    const player = playersDB.find(p => p.name === playerName);
     if (!player) {
         showNotif('❌ Ошибка', 'Игрок не найден', 'error');
         return;
@@ -146,8 +947,11 @@ function viewPlayerProfile(playerName) {
                 <div class="profile-modal-header">
                     <div class="profile-modal-avatar">👤</div>
                     <div class="profile-modal-info">
-                        <h2>${player.name || 'Игрок'}</h2>
+                        <h2>${player.name}</h2>
                         <div class="profile-modal-title">${player.title || '👆 Новичок'}</div>
+                        ${player.role === 'vip' ? '<div style="color: #f1c40f;">👑 VIP</div>' : ''}
+                        ${player.role === 'content' ? '<div style="color: #e67e22;">🎬 Content Maker</div>' : ''}
+                        ${player.clan ? '<div style="color: var(--accent);">🏰 Клан: ' + player.clan.name + '</div>' : ''}
                     </div>
                     <button class="profile-modal-close" onclick="closeProfileModal()">✕</button>
                 </div>
@@ -202,14 +1006,13 @@ function viewPlayerProfile(playerName) {
                 
                 ${player.name !== gameState.nickname ? `
                     <div class="profile-modal-actions">
-                        <button class="btn-primary" onclick="addFriend('${player.name}')">➕ Добавить в друзья</button>
+                        <button class="btn-primary" onclick="sendFriendRequest('${player.name}')">➕ Добавить в друзья</button>
                     </div>
                 ` : ''}
             </div>
         </div>
     `;
     
-    // Удаляем старую модалку если есть
     const oldModal = document.getElementById('profileModal');
     if (oldModal) oldModal.remove();
     
@@ -224,69 +1027,19 @@ function closeProfileModal() {
     if (modal) modal.remove();
 }
 
-function addFriend(playerName) {
-    if (!playerName) return;
-    if (!gameState.friends) gameState.friends = [];
-    if (gameState.friends.includes(playerName)) {
-        showNotif('❌ Уже в друзьях', '', 'error');
-        return;
-    }
-    gameState.friends.push(playerName);
-    showNotif('✅ Добавлен в друзья', playerName, 'success');
-    closeProfileModal();
-    saveGame();
-}
-
 // ========== ТАБЛИЦА ЛИДЕРОВ ==========
 function loadLeaderboard() {
     const saved = localStorage.getItem('leaderboard_db');
     if (saved) {
         try {
             leaderboardDB = JSON.parse(saved);
-            // Фильтруем битые записи
-            leaderboardDB = leaderboardDB.filter(player => {
-                if (!player || !player.name) return false;
-                const name = player.name.toLowerCase().trim();
-                const bannedNames = ['бот', 'bot', 'test', 'тест', 'demo', 'демо'];
-                for (let banned of bannedNames) {
-                    if (name.includes(banned)) return false;
-                }
-                return name.length >= 3 && !isNaN(player.score) && player.score >= 0;
-            });
         } catch (e) {
             leaderboardDB = [];
         }
     } else {
         leaderboardDB = [];
     }
-    
-    leaderboardDB.sort((a, b) => (b.score || 0) - (a.score || 0));
-    if (leaderboardDB.length > 20) leaderboardDB = leaderboardDB.slice(0, 20);
-    saveLeaderboard();
     renderLeaderboard();
-}
-
-function saveLeaderboard() {
-    try {
-        if (gameState.nickname && gameState.nickname.length >= 3) {
-            const playerScore = isNaN(gameState.balance) ? 0 : Math.floor(gameState.balance || 0);
-            leaderboardDB = leaderboardDB.filter(p => p && p.name !== gameState.nickname);
-            leaderboardDB.push({
-                name: gameState.nickname,
-                score: playerScore,
-                title: gameState.title || '👆 Новичок',
-                lastUpdate: Date.now()
-            });
-        }
-        
-        leaderboardDB.sort((a, b) => (b.score || 0) - (a.score || 0));
-        if (leaderboardDB.length > 20) leaderboardDB = leaderboardDB.slice(0, 20);
-        
-        localStorage.setItem('leaderboard_db', JSON.stringify(leaderboardDB));
-        renderLeaderboard();
-    } catch (e) {
-        console.error('Ошибка сохранения лидеров:', e);
-    }
 }
 
 function renderLeaderboard() {
@@ -318,6 +1071,8 @@ function renderLeaderboard() {
                 <span class="leader-name">
                     ${player.name || 'Игрок'}
                     ${player.title ? `<span class="leader-title">${player.title}</span>` : ''}
+                    ${player.role === 'vip' ? `<span class="leader-title">👑 VIP</span>` : ''}
+                    ${player.role === 'content' ? `<span class="leader-title">🎬 CM</span>` : ''}
                 </span>
                 <span class="leader-score">💰 ${formatNumber(score)}</span>
             </div>
@@ -399,7 +1154,6 @@ function selectTitle(titleName) {
         showNotif('✅ Титул надет!', titleName, 'success');
         saveGame();
         updatePlayerData();
-        saveLeaderboard();
     }
 }
 
@@ -524,7 +1278,6 @@ function saveGame() {
     try {
         localStorage.setItem('clicker_save', JSON.stringify(gameState));
         updatePlayerData();
-        saveLeaderboard();
         return true;
     } catch (e) {
         console.error('Ошибка сохранения:', e);
@@ -537,7 +1290,6 @@ function loadGame() {
         const saved = localStorage.getItem('clicker_save');
         if (saved) {
             const data = JSON.parse(saved);
-            // Защита от NaN
             Object.keys(data).forEach(key => {
                 if (typeof data[key] === 'number' && isNaN(data[key])) {
                     data[key] = 0;
@@ -552,7 +1304,7 @@ function loadGame() {
     return false;
 }
 
-// ========== ЗАГРУЗКА ФАЙЛА ==========
+// ========== ЗАГРУЗКА ФАЙЛА С ЗАЩИТОЙ ==========
 function loadClickFile() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -576,7 +1328,15 @@ function loadClickFile() {
             try {
                 const data = JSON.parse(event.target.result);
                 
-                // Защита от NaN
+                const deviceId = getDeviceId();
+                if (data.deviceId && data.deviceId !== deviceId) {
+                    if (!confirm('⚠️ Этот файл создан на другом устройстве. Загрузить его? (Привязка устройства изменится)')) {
+                        document.getElementById('loading').style.display = 'none';
+                        document.body.removeChild(input);
+                        return;
+                    }
+                }
+                
                 Object.keys(data).forEach(key => {
                     if (typeof data[key] === 'number' && isNaN(data[key])) {
                         data[key] = 0;
@@ -584,6 +1344,9 @@ function loadClickFile() {
                 });
                 
                 gameState = { ...gameState, ...data };
+                gameState.deviceId = deviceId;
+                
+                linkDevice(gameState.nickname);
                 
                 document.getElementById('playerName').textContent = gameState.nickname || 'Игрок';
                 document.getElementById('profileName').textContent = gameState.nickname || 'Игрок';
@@ -595,8 +1358,12 @@ function loadClickFile() {
                 renderSkins();
                 renderCases();
                 renderTitles();
+                renderFriends();
+                renderClans();
+                updateRoleUI();
+                updateClanUI();
+                updateAdminVisibility();
                 updatePlayerData();
-                saveLeaderboard();
                 
                 showNotif('✅ Успешно', 'Игра загружена');
             } catch (error) {
@@ -632,6 +1399,36 @@ function showNotif(title, msg, type = 'success') {
     
     if (gameState.settings && gameState.settings.vibration && type === 'success') {
         navigator.vibrate?.(50);
+    }
+}
+
+// ========== ОБНОВЛЕНИЕ UI РОЛИ ==========
+function updateRoleUI() {
+    const playerBadge = document.getElementById('playerBadge');
+    const profileBadge = document.getElementById('profileBadge');
+    
+    if (playerBadge) {
+        playerBadge.className = 'player-badge';
+        playerBadge.innerHTML = '';
+        if (gameState.role === 'vip') {
+            playerBadge.classList.add('vip');
+            playerBadge.innerHTML = '👑 VIP';
+        } else if (gameState.role === 'content') {
+            playerBadge.classList.add('content');
+            playerBadge.innerHTML = '🎬 Content Maker';
+        }
+    }
+    
+    if (profileBadge) {
+        profileBadge.className = 'profile-badge';
+        profileBadge.innerHTML = '';
+        if (gameState.role === 'vip') {
+            profileBadge.classList.add('vip');
+            profileBadge.innerHTML = '👑 VIP статус';
+        } else if (gameState.role === 'content') {
+            profileBadge.classList.add('content');
+            profileBadge.innerHTML = '🎬 Content Maker';
+        }
     }
 }
 
@@ -694,12 +1491,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     loadPlayersDB();
     loadLeaderboard();
+    loadClansDB();
+    loadCustomPromoCodes();
+    loadEvents();
     
     if (loadGame() && gameState.nickname) {
         document.getElementById('playerName').textContent = gameState.nickname;
         document.getElementById('profileName').textContent = gameState.nickname;
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
+        updateRoleUI();
+        updateClanUI();
+        updateAdminVisibility();
         updatePlayerData();
     }
     
@@ -713,6 +1516,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCases();
     renderPromoList();
     renderTitles();
+    renderFriends();
+    renderClans();
     updateTurboUI();
     startLoop();
 });
@@ -721,25 +1526,49 @@ document.addEventListener('DOMContentLoaded', () => {
 function initEvents() {
     document.getElementById('loginBtn').addEventListener('click', () => {
         const name = document.getElementById('loginInput').value.trim();
+        const deviceId = getDeviceId();
+        
         if (!name || name.length < 3) {
             showNotif('❌ Ошибка', 'Минимум 3 символа', 'error');
             return;
         }
         
-        if (!isNicknameUnique(name)) {
+        const linkedNickname = localStorage.getItem('linked_nickname');
+        if (linkedNickname && linkedNickname !== name) {
+            showNotif('❌ Ошибка', 'На этом устройстве уже есть аккаунт. Используйте загрузку файла для смены.', 'error');
+            return;
+        }
+        
+        if (!isNicknameUnique(name) && !linkedNickname) {
             showNotif('❌ Ошибка', 'Этот ник уже занят', 'error');
             return;
         }
         
+        const existingPlayer = playersDB.find(p => p.name === name);
+        if (existingPlayer) {
+            loadPlayerData(name);
+        } else {
+            registerPlayer(name, deviceId);
+            loadPlayerData(name);
+        }
+        
         gameState.nickname = name;
+        gameState.deviceId = deviceId;
+        
+        linkDevice(name);
+        
         document.getElementById('playerName').textContent = name;
         document.getElementById('profileName').textContent = name;
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'block';
         
-        registerPlayer(name);
+        updateRoleUI();
+        updateClanUI();
+        updateAdminVisibility();
+        renderFriends();
+        renderClans();
         saveGame();
-        saveLeaderboard();
+        
         showNotif('✅ Добро пожаловать!', `Привет, ${name}!`);
         updateUI();
     });
@@ -772,6 +1601,61 @@ function initEvents() {
         document.getElementById('autoMenu').classList.remove('active');
     });
     
+    // Друзья
+    document.getElementById('addFriendBtn')?.addEventListener('click', () => {
+        document.getElementById('addFriendModal').style.display = 'flex';
+    });
+    
+    document.getElementById('sendFriendRequest')?.addEventListener('click', () => {
+        const friendName = document.getElementById('friendNameInput').value.trim();
+        if (friendName) {
+            sendFriendRequest(friendName);
+            document.getElementById('addFriendModal').style.display = 'none';
+            document.getElementById('friendNameInput').value = '';
+        }
+    });
+    
+    document.getElementById('closeAddFriend')?.addEventListener('click', () => {
+        document.getElementById('addFriendModal').style.display = 'none';
+        document.getElementById('friendNameInput').value = '';
+    });
+    
+    document.querySelectorAll('.friends-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.friends-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            renderFriends();
+        });
+    });
+    
+    // Кланы
+    document.getElementById('createClanBtn')?.addEventListener('click', () => {
+        document.getElementById('createClanModal').style.display = 'flex';
+    });
+    
+    document.getElementById('confirmCreateClan')?.addEventListener('click', () => {
+        const clanName = document.getElementById('clanNameInput').value.trim();
+        const clanType = document.getElementById('clanTypeSelect').value;
+        if (clanName) {
+            createClan(clanName, clanType);
+            document.getElementById('createClanModal').style.display = 'none';
+            document.getElementById('clanNameInput').value = '';
+        }
+    });
+    
+    document.getElementById('closeCreateClan')?.addEventListener('click', () => {
+        document.getElementById('createClanModal').style.display = 'none';
+        document.getElementById('clanNameInput').value = '';
+    });
+    
+    document.getElementById('clanSearchInput')?.addEventListener('input', () => renderClans());
+    
+    // Админ панель
+    document.getElementById('adminGive')?.addEventListener('click', adminGiveResources);
+    document.getElementById('adminAddPromo')?.addEventListener('click', adminAddPromo);
+    document.getElementById('adminAddEvent')?.addEventListener('click', adminAddEvent);
+    document.getElementById('playersSearch')?.addEventListener('input', () => renderAdminPlayersList());
+    
     document.querySelectorAll('.menu-item').forEach(item => {
         item.addEventListener('click', () => {
             document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
@@ -785,6 +1669,13 @@ function initEvents() {
             
             if (tab === 'leaders') renderLeaderboard();
             else if (tab === 'profile') renderTitles();
+            else if (tab === 'friends') renderFriends();
+            else if (tab === 'clans') renderClans();
+            else if (tab === 'admin') {
+                renderAdminPromoList();
+                renderAdminEventsList();
+                renderAdminPlayersList();
+            }
         });
     });
     
@@ -824,7 +1715,6 @@ function initEvents() {
             checkTitles();
             updateUI();
             saveGame();
-            saveLeaderboard();
         } else {
             showNotif('⏰ Уже получали', 'Завтра будет снова', 'warning');
         }
@@ -840,7 +1730,6 @@ function initEvents() {
             showNotif('🎁 Подарок!', '+50 монет');
             updateUI();
             saveGame();
-            saveLeaderboard();
         } else {
             const left = 86400000 - (now - last);
             const hours = Math.floor(left / 3600000);
@@ -851,7 +1740,12 @@ function initEvents() {
     
     document.getElementById('saveToFile').addEventListener('click', () => {
         try {
-            const data = JSON.stringify(gameState, null, 2);
+            const dataToSave = {
+                ...gameState,
+                deviceId: getDeviceId(),
+                exportDate: Date.now()
+            };
+            const data = JSON.stringify(dataToSave, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -867,7 +1761,6 @@ function initEvents() {
     
     document.getElementById('logoutBtn').addEventListener('click', () => {
         saveGame();
-        saveLeaderboard();
         document.getElementById('gameContainer').style.display = 'none';
         document.getElementById('authModal').style.display = 'flex';
         document.getElementById('loginInput').value = '';
@@ -891,38 +1784,63 @@ function initEvents() {
             return;
         }
         
-        let msg = '';
+        const customPromo = customPromoCodes.find(p => p.code === code);
         
-        switch(code) {
-            case 'START':
-                gameState.balance = (gameState.balance || 0) + 100;
-                msg = '+100💰';
-                break;
-            case 'GIFT':
-                gameState.balance = (gameState.balance || 0) + 300;
-                msg = '+300💰';
-                break;
-            case 'POWER':
-                gameState.power = (gameState.power || 1) + 1;
-                msg = 'Сила +1';
-                break;
-            case 'TURBO':
-                activateTurbo();
-                msg = 'Турбо активирован!';
-                break;
-            default:
-                showNotif('❌ Неверный код', '', 'error');
-                return;
+        if (customPromo) {
+            switch(customPromo.type) {
+                case 'money':
+                    gameState.balance = (gameState.balance || 0) + customPromo.value;
+                    showNotif('✅ Промокод!', `+${customPromo.value}💰`, 'success');
+                    break;
+                case 'clicks':
+                    gameState.totalClicks = (gameState.totalClicks || 0) + customPromo.value;
+                    showNotif('✅ Промокод!', `+${customPromo.value} кликов`, 'success');
+                    break;
+                case 'vip':
+                    gameState.role = 'vip';
+                    updateRoleUI();
+                    showNotif('✅ Промокод!', 'Получен VIP статус!', 'success');
+                    break;
+                case 'turbo':
+                    activateTurbo();
+                    showNotif('✅ Промокод!', 'Турбо активирован!', 'success');
+                    break;
+            }
+            
+            customPromo.uses++;
+            saveCustomPromoCodes();
+        } else {
+            let msg = '';
+            switch(code) {
+                case 'START':
+                    gameState.balance = (gameState.balance || 0) + 100;
+                    msg = '+100💰';
+                    break;
+                case 'GIFT':
+                    gameState.balance = (gameState.balance || 0) + 300;
+                    msg = '+300💰';
+                    break;
+                case 'POWER':
+                    gameState.power = (gameState.power || 1) + 1;
+                    msg = 'Сила +1';
+                    break;
+                case 'TURBO':
+                    activateTurbo();
+                    msg = 'Турбо активирован!';
+                    break;
+                default:
+                    showNotif('❌ Неверный код', '', 'error');
+                    return;
+            }
+            showNotif('✅ Промокод!', msg, 'success');
         }
         
         if (!gameState.usedCodes) gameState.usedCodes = [];
         gameState.usedCodes.push(code);
         document.getElementById('promoInput').value = '';
-        showNotif('✅ Промокод!', msg);
         checkTitles();
         updateUI();
         saveGame();
-        saveLeaderboard();
     });
     
     document.getElementById('notificationsCheck').addEventListener('change', (e) => {
@@ -977,7 +1895,6 @@ function initEvents() {
             updateUI();
             updateAutoMenu();
             saveGame();
-            saveLeaderboard();
         } else {
             showNotif('❌ Недостаточно', `Нужно ${price}💰`, 'error');
         }
@@ -1053,6 +1970,13 @@ function renderShop() {
             <span class="card-price">50💰</span>
             <button class="card-btn" onclick="buyItem('turbo')">Купить</button>
         </div>
+        <div class="shop-card">
+            <span class="card-icon">👑</span>
+            <span class="card-title">VIP Статус</span>
+            <span class="card-desc">Эксклюзивный значок</span>
+            <span class="card-price">1000💰</span>
+            <button class="card-btn" onclick="buyItem('vip')">Купить</button>
+        </div>
     `;
 }
 
@@ -1084,12 +2008,22 @@ window.buyItem = function(type) {
             showNotif('❌ Недостаточно', 'Нужно 50💰', 'error');
             return;
         }
+    } else if (type === 'vip') {
+        if ((gameState.balance || 0) >= 1000) {
+            gameState.balance -= 1000;
+            gameState.role = 'vip';
+            updateRoleUI();
+            showNotif('✅ Куплено!', 'VIP статус получен!', 'success');
+            checkTitles();
+        } else {
+            showNotif('❌ Недостаточно', 'Нужно 1000💰', 'error');
+            return;
+        }
     }
     
     updateUI();
     updateAutoMenu();
     saveGame();
-    saveLeaderboard();
 };
 
 // ========== СКИНЫ ==========
@@ -1139,7 +2073,6 @@ function renderSkins() {
                 showNotif('✅ Скин куплен!');
                 checkTitles();
                 saveGame();
-                saveLeaderboard();
             } else {
                 showNotif('❌ Недостаточно', `Нужно ${price}💰`, 'error');
             }
@@ -1221,7 +2154,6 @@ window.openCase = function(type) {
         
         updateUI();
         saveGame();
-        saveLeaderboard();
     });
 };
 
@@ -1254,7 +2186,7 @@ function renderPromoList() {
     const list = document.getElementById('promoList');
     if (!list) return;
     
-    list.innerHTML = `
+    let html = `
         <div class="promo-item">
             <span class="promo-code">START</span>
             <span class="promo-reward">+100💰</span>
@@ -1272,6 +2204,17 @@ function renderPromoList() {
             <span class="promo-reward">Бесплатный турбо</span>
         </div>
     `;
+    
+    customPromoCodes.forEach(promo => {
+        html += `
+            <div class="promo-item">
+                <span class="promo-code">${promo.code}</span>
+                <span class="promo-reward">${promo.type === 'money' ? '+' + promo.value + '💰' : promo.type === 'clicks' ? '+' + promo.value + ' кликов' : promo.type === 'vip' ? 'VIP статус' : 'Турбо'}</span>
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
 }
 
 // ========== ТАЙМЕР ПОДАРКА ==========
@@ -1369,4 +2312,16 @@ window.openCase = openCase;
 window.selectTitle = selectTitle;
 window.viewPlayerProfile = viewPlayerProfile;
 window.closeProfileModal = closeProfileModal;
-window.addFriend = addFriend;
+window.deletePromoCode = deletePromoCode;
+window.deleteEvent = deleteEvent;
+window.sendFriendRequest = sendFriendRequest;
+window.acceptFriendRequest = acceptFriendRequest;
+window.declineFriendRequest = declineFriendRequest;
+window.removeFriend = removeFriend;
+window.sendGift = sendGift;
+window.createClan = createClan;
+window.sendClanRequest = sendClanRequest;
+window.joinClan = joinClan;
+window.leaveClan = leaveClan;
+window.kickFromClan = kickFromClan;
+window.upgradeClan = upgradeClan;
