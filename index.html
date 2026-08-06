@@ -1,436 +1,435 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CLICKER 7.1</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>Vanilla155 · школьный сервер</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,500..700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0b0e1a;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 20% 30%, rgba(255, 215, 150, 0.08) 0%, transparent 30%),
+        radial-gradient(circle at 80% 70%, rgba(230, 180, 120, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 40% 90%, rgba(200, 150, 100, 0.05) 0%, transparent 35%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .server-card {
+      position: relative;
+      z-index: 2;
+      max-width: 820px;
+      width: 100%;
+      background: rgba(22, 28, 46, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 56px 56px 48px 48px;
+      padding: 2.8rem 2.5rem 3.2rem;
+      box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 215, 150, 0.2) inset;
+      border: 1px solid rgba(255, 215, 150, 0.15);
+    }
+
+    .server-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 56px 56px 48px 48px;
+      background: repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255, 215, 150, 0.01) 40px, rgba(255, 215, 150, 0.02) 42px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card-content {
+      position: relative;
+      z-index: 3;
+    }
+
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.2rem 2rem;
+      margin-bottom: 2.5rem;
+      border-bottom: 1px dashed rgba(255, 215, 150, 0.25);
+      padding-bottom: 1.4rem;
+    }
+
+    .server-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(255, 215, 150, 0.3);
+      box-shadow: 0 0 20px rgba(245, 205, 140, 0.15);
+      flex-shrink: 0;
+      background: #1e2538;
+    }
+
+    .server-title-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.5rem 1rem;
+      flex: 1;
+    }
+
+    .server-name {
+      font-size: 3.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #f7e3c0 0%, #f5d5a0 45%, #eac08a 80%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 20px rgba(245, 205, 140, 0.2);
+      line-height: 1.1;
+    }
+
+    .server-version {
+      font-size: 1rem;
+      font-weight: 500;
+      background: rgba(255, 215, 150, 0.08);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      padding: 0.4rem 1.2rem;
+      border-radius: 40px;
+      color: #ecd6b0;
+      border: 1px solid rgba(255, 215, 150, 0.15);
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .description-block {
+      background: rgba(0,0,0,0.2);
+      border-radius: 32px;
+      padding: 1.8rem 2rem;
+      margin: 1.8rem 0 2.8rem;
+      border: 1px solid rgba(255, 215, 150, 0.08);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .description-icon {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      flex-shrink: 0;
+      border-radius: 12px;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+    }
+
+    .description-block p {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      color: #d6c9b2;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .description-block strong {
+      color: #f5d5a0;
+      font-weight: 600;
+    }
+
+    .description-block .tagline {
+      color: #ecd6b0;
+      display: inline-block;
+      margin-top: 0.3rem;
+    }
+
+    .ip-section {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.2rem;
+      background: rgba(0,0,0,0.3);
+      padding: 0.8rem 1.6rem 0.8rem 2rem;
+      border-radius: 80px;
+      border: 1px solid rgba(255, 215, 150, 0.15);
+      backdrop-filter: blur(4px);
+      margin: 2.8rem 0 2.2rem;
+    }
+
+    .ip-label {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 500;
+      color: #b9ad9a;
+      font-size: 0.95rem;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .ip-icon {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    }
+
+    .ip-address {
+      font-family: 'Inter', monospace;
+      font-weight: 600;
+      font-size: 1.5rem;
+      color: #f5e5d0;
+      letter-spacing: 0.5px;
+      background: rgba(255, 215, 150, 0.06);
+      padding: 0.2rem 1rem;
+      border-radius: 40px;
+      border: 1px solid rgba(255, 215, 150, 0.1);
+      word-break: break-all;
+      text-align: center;
+    }
+
+    .ip-address span {
+      background: rgba(255, 215, 150, 0.05);
+      padding: 0.1rem 0.6rem;
+      border-radius: 30px;
+    }
+
+    .social-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem 1.5rem;
+      margin: 2rem 0 0.5rem;
+    }
+
+    .social-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.75rem 1.8rem;
+      border-radius: 60px;
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 215, 150, 0.1);
+      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.25);
+      color: #ecd6b0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .social-btn:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+      border-color: rgba(255, 215, 150, 0.3);
+    }
+
+    .social-btn .social-icon {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    }
+
+    .social-btn.max {
+      background: rgba(255, 215, 150, 0.08);
+      border-color: rgba(255, 215, 150, 0.2);
+    }
+
+    .social-btn.max:hover {
+      background: rgba(255, 215, 150, 0.15);
+    }
+
+    .social-btn.telegram {
+      background: rgba(100, 180, 255, 0.08);
+      border-color: rgba(100, 180, 255, 0.15);
+    }
+
+    .social-btn.telegram:hover {
+      background: rgba(100, 180, 255, 0.15);
+      border-color: rgba(100, 180, 255, 0.3);
+    }
+
+    .footer-note {
+      margin-top: 3.2rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #6a5f4e;
+      letter-spacing: 0.2px;
+      border-top: 1px solid rgba(255, 215, 150, 0.05);
+      padding-top: 1.6rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem 1.2rem;
+    }
+
+    .footer-note a {
+      color: #b9a582;
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(255, 215, 150, 0.15);
+    }
+
+    .footer-note a:hover {
+      color: #ecd6b0;
+      border-bottom-color: #ecd6b0;
+    }
+
+    @media (max-width: 650px) {
+      .server-card {
+        padding: 1.8rem 1.2rem 2.4rem;
+        border-radius: 36px;
+      }
+      .server-name {
+        font-size: 2.4rem;
+      }
+      .server-avatar {
+        width: 60px;
+        height: 60px;
+      }
+      .header {
+        flex-wrap: wrap;
+        gap: 0.8rem;
+      }
+      .server-title-group {
+        flex-wrap: wrap;
+      }
+      .description-block {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.4rem 1.2rem;
+      }
+      .description-icon {
+        width: 48px;
+        height: 48px;
+      }
+      .ip-section {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1.2rem 1.2rem;
+        border-radius: 40px;
+        gap: 0.6rem;
+      }
+      .ip-address {
+        font-size: 1.2rem;
+        padding: 0.3rem 0.8rem;
+      }
+      .social-links {
+        flex-direction: column;
+        width: 100%;
+      }
+      .social-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 0.8rem 1.2rem;
+      }
+      .description-block p {
+        font-size: 1rem;
+      }
+    }
+
+    @media (max-width: 450px) {
+      .server-name {
+        font-size: 2rem;
+      }
+      .ip-address {
+        font-size: 1rem;
+      }
+      .server-avatar {
+        width: 48px;
+        height: 48px;
+      }
+    }
+  </style>
 </head>
-<body data-theme="dark">
-    <!-- Затемнение при загрузке -->
-    <div class="loading" id="loading" style="display: none;">
-        <div class="spinner"></div>
+<body>
+  <div class="server-card">
+    <div class="card-content">
+
+      <div class="header">
+        <img 
+          src="https://i.pinimg.com/originals/30/7f/f3/307ff32ca747976a871599741649406a.jpg" 
+          alt="Vanilla155" 
+          class="server-avatar"
+          loading="lazy"
+          onerror="this.style.display='none'"
+        >
+        <div class="server-title-group">
+          <h1 class="server-name">Vanilla155</h1>
+          <span class="server-version">версия 26.2</span>
+        </div>
+      </div>
+
+      <div class="description-block">
+        <img 
+          src="https://img.icons8.com/fluency/96/minecraft-logo.png" 
+          alt="Minecraft" 
+          class="description-icon"
+          loading="lazy"
+          onerror="this.style.display='none'"
+        >
+        <p>
+          <strong>Vanilla155</strong> — уютный ванильный сервер для школы и друзей. 
+          Здесь мы строим, исследуем и отдыхаем после уроков. 
+          <span class="tagline">✦ чистый ванильный геймплей ✦</span>
+        </p>
+      </div>
+
+      <div class="ip-section">
+        <span class="ip-label">
+          <img 
+            src="https://img.icons8.com/fluency/96/internet.png" 
+            alt="IP" 
+            class="ip-icon"
+            loading="lazy"
+            onerror="this.style.display='none'"
+          >
+          IP-адрес
+        </span>
+        <div class="ip-address">
+          <span>vanilla155.aternos.me</span>
+        </div>
+      </div>
+
+      <div class="social-links">
+        <a href="https://t.me/+peVdToLWEV1jYTRi" target="_blank" rel="noopener noreferrer" class="social-btn telegram">
+          <img 
+            src="https://img.icons8.com/fluency/96/telegram-app.png" 
+            alt="Telegram" 
+            class="social-icon"
+            loading="lazy"
+            onerror="this.style.display='none'"
+          >
+          Telegram
+        </a>
+      </div>
+
     </div>
-
-    <!-- ВХОД -->
-    <div class="modal" id="authModal">
-        <div class="modal-content">
-            <h2 class="gradient-text">🔐 Вход в игру</h2>
-            <div class="device-info" id="deviceInfo"></div>
-            <input type="text" id="loginInput" placeholder="Ваш ник" maxlength="20">
-            <p class="hint" id="nicknameHint">🔍 Введите ник (мин. 3 символа)</p>
-            <div class="modal-buttons">
-                <button class="btn-primary" id="loginBtn">Создать / Войти</button>
-                <button class="btn-secondary" id="loadGameFile">📂 Загрузить .click</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ИГРА -->
-    <div class="game" id="gameContainer" style="display: none;">
-        
-        <!-- Верхняя панель -->
-        <div class="header">
-            <div class="player" id="profileBtn">
-                <div class="avatar">👤</div>
-                <div class="player-info">
-                    <div class="player-name" id="playerName">Игрок</div>
-                    <div class="player-level" id="playerLevel">Уровень 1</div>
-                    <div class="player-badge" id="playerBadge"></div>
-                    <div class="player-clan" id="playerClan"></div>
-                </div>
-            </div>
-            <div class="header-buttons">
-                <button class="icon-btn" id="themeToggle">🌙</button>
-                <button class="icon-btn" id="adminBtn" style="display: none;">👑</button>
-                <button class="icon-btn" id="menuToggle">☰</button>
-            </div>
-        </div>
-
-        <!-- Боковое меню -->
-        <div class="menu" id="sideMenu">
-            <div class="menu-header">
-                <span>Меню</span>
-                <button class="close-btn" id="closeMenu">✕</button>
-            </div>
-            <div class="menu-items">
-                <button class="menu-item active" data-tab="profile">👤 Профиль</button>
-                <button class="menu-item" data-tab="friends">👥 Друзья</button>
-                <button class="menu-item" data-tab="clans">🏰 Кланы</button>
-                <button class="menu-item" data-tab="shop">🏪 Магазин</button>
-                <button class="menu-item" data-tab="skins">🎨 Скины</button>
-                <button class="menu-item" data-tab="cases">🎁 Кейсы</button>
-                <button class="menu-item" data-tab="promo">🎫 Промокоды</button>
-                <button class="menu-item" data-tab="leaders">🏆 Лидеры</button>
-                <button class="menu-item" data-tab="admin" id="adminMenuItem" style="display: none;">👑 Админ панель</button>
-                <button class="menu-item" data-tab="settings">⚙️ Настройки</button>
-            </div>
-            <div class="menu-footer">
-                <button class="menu-btn save" id="saveToFile">💾 Сохранить</button>
-                <button class="menu-btn logout" id="logoutBtn">🚪 Выйти</button>
-            </div>
-        </div>
-
-        <!-- Статистика -->
-        <div class="stats-row">
-            <div class="stat-card">
-                <span class="stat-icon">💰</span>
-                <span class="stat-value" id="balance">0</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-icon">⚡</span>
-                <span class="stat-value" id="power">1</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-icon">📈</span>
-                <span class="stat-value" id="cps">0</span>
-            </div>
-        </div>
-
-        <!-- Кнопка кликера -->
-        <div class="clicker-wrapper">
-            <button class="clicker" id="clickBtn">
-                <span class="clicker-emoji">👆</span>
-                <span class="clicker-text">КЛИК</span>
-            </button>
-        </div>
-
-        <!-- Быстрые действия -->
-        <div class="quick-row">
-            <button class="quick-btn" id="dailyBtn">
-                <span>📅</span>
-                <span>День</span>
-            </button>
-            <button class="quick-btn" id="casesBtn">
-                <span>🎁</span>
-                <span>Кейсы</span>
-            </button>
-            <button class="quick-btn" id="autoMenuBtn">
-                <span>🤖</span>
-                <span>Авто</span>
-            </button>
-        </div>
-
-        <!-- Индикатор турбо -->
-        <div class="turbo-indicator" id="turboIndicator" style="display: none;">
-            <span>⚡ ТУРБО РЕЖИМ ⚡</span>
-        </div>
-
-        <!-- Контентная область -->
-        <div class="content" id="content">
-            
-            <!-- ПРОФИЛЬ -->
-            <div class="tab active" id="profile">
-                <div class="profile-header">
-                    <div class="profile-avatar">👤</div>
-                    <div class="profile-info">
-                        <div class="profile-name" id="profileName">Игрок</div>
-                        <div class="profile-level" id="profileLevel">Уровень 1</div>
-                        <div class="profile-badge" id="profileBadge"></div>
-                        <div class="profile-clan" id="profileClan"></div>
-                    </div>
-                </div>
-                
-                <div class="stats-list">
-                    <div class="stat-row">
-                        <span>Всего кликов:</span>
-                        <span class="stat-highlight" id="totalClicks">0</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Заработано:</span>
-                        <span class="stat-highlight" id="totalEarned">0</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Кейсов открыто:</span>
-                        <span class="stat-highlight" id="totalCases">0</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Лучший выигрыш:</span>
-                        <span class="stat-highlight" id="bestWin">0💰</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Дней в игре:</span>
-                        <span class="stat-highlight" id="totalDays">1</span>
-                    </div>
-                </div>
-
-                <!-- БЛОК ТИТУЛОВ -->
-                <div class="profile-titles" id="profileTitles"></div>
-            </div>
-
-            <!-- ДРУЗЬЯ (НОВАЯ ВКЛАДКА) -->
-            <div class="tab" id="friends">
-                <div class="friends-header">
-                    <h3>👥 Друзья</h3>
-                    <button class="btn-add" id="addFriendBtn">➕ Добавить друга</button>
-                </div>
-
-                <div class="friends-tabs">
-                    <button class="friends-tab active" data-friends="all">Все</button>
-                    <button class="friends-tab" data-friends="online">Онлайн</button>
-                    <button class="friends-tab" data-friends="requests">Заявки</button>
-                </div>
-
-                <div class="friends-list" id="friendsList"></div>
-
-                <!-- Модалка добавления друга -->
-                <div class="modal-small" id="addFriendModal" style="display: none;">
-                    <div class="modal-small-content">
-                        <h4>Добавить друга</h4>
-                        <input type="text" id="friendNameInput" placeholder="Введите ник друга">
-                        <div class="modal-small-actions">
-                            <button class="btn-primary" id="sendFriendRequest">Отправить</button>
-                            <button class="btn-secondary" id="closeAddFriend">Отмена</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- КЛАНЫ (НОВАЯ ВКЛАДКА) -->
-            <div class="tab" id="clans">
-                <div class="clans-header">
-                    <h3>🏰 Кланы</h3>
-                    <button class="btn-add" id="createClanBtn">➕ Создать клан</button>
-                </div>
-
-                <div class="my-clan-section" id="myClanSection" style="display: none;">
-                    <h4>Мой клан</h4>
-                    <div class="clan-card my-clan" id="myClanCard"></div>
-                </div>
-
-                <div class="clans-search">
-                    <input type="text" id="clanSearchInput" placeholder="🔍 Поиск кланов...">
-                </div>
-
-                <div class="clans-list" id="clansList"></div>
-
-                <!-- Модалка создания клана -->
-                <div class="modal-small" id="createClanModal" style="display: none;">
-                    <div class="modal-small-content">
-                        <h4>Создать клан</h4>
-                        <input type="text" id="clanNameInput" placeholder="Название клана" maxlength="20">
-                        <select id="clanTypeSelect">
-                            <option value="public">🔓 Публичный</option>
-                            <option value="private">🔒 Приватный</option>
-                        </select>
-                        <div class="modal-small-actions">
-                            <button class="btn-primary" id="confirmCreateClan">Создать (500💰)</button>
-                            <button class="btn-secondary" id="closeCreateClan">Отмена</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Модалка вступления в клан -->
-                <div class="modal-small" id="joinClanModal" style="display: none;">
-                    <div class="modal-small-content">
-                        <h4>Вступить в клан</h4>
-                        <p id="joinClanInfo"></p>
-                        <div class="modal-small-actions">
-                            <button class="btn-primary" id="confirmJoinClan">Вступить</button>
-                            <button class="btn-secondary" id="closeJoinClan">Отмена</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- МАГАЗИН -->
-            <div class="tab" id="shop">
-                <h3>🏪 Магазин</h3>
-                <div class="shop-grid" id="shopGrid"></div>
-            </div>
-
-            <!-- СКИНЫ -->
-            <div class="tab" id="skins">
-                <h3>🎨 Скины</h3>
-                <div class="skins-grid" id="skinsGrid"></div>
-            </div>
-
-            <!-- КЕЙСЫ -->
-            <div class="tab" id="cases">
-                <h3>🎁 Кейсы</h3>
-                <div class="cases-grid" id="casesGrid"></div>
-            </div>
-
-            <!-- ПРОМОКОДЫ -->
-            <div class="tab" id="promo">
-                <h3>🎫 Промокоды</h3>
-                <div class="promo-container">
-                    <input type="text" id="promoInput" placeholder="Введите промокод">
-                    <button class="btn-primary" id="activatePromo">Активировать</button>
-                </div>
-                <div class="promo-list" id="promoList"></div>
-            </div>
-
-            <!-- ЛИДЕРЫ -->
-            <div class="tab" id="leaders">
-                <h3>🏆 Таблица лидеров</h3>
-                <div class="leaderboard" id="leaderboard"></div>
-            </div>
-
-            <!-- АДМИН ПАНЕЛЬ -->
-            <div class="tab" id="admin">
-                <h3>👑 Админ панель</h3>
-                
-                <div class="admin-section">
-                    <h4>Выдача ресурсов</h4>
-                    <div class="admin-form">
-                        <input type="text" id="adminPlayerName" placeholder="Ник игрока">
-                        <input type="number" id="adminClicks" placeholder="Клики">
-                        <input type="number" id="adminMoney" placeholder="Монеты">
-                        <select id="adminRole">
-                            <option value="">Выдать роль</option>
-                            <option value="vip">👑 VIP</option>
-                            <option value="content">🎬 Content Maker</option>
-                        </select>
-                        <button class="btn-primary" id="adminGive">Выдать</button>
-                    </div>
-                </div>
-
-                <div class="admin-section">
-                    <h4>Управление промокодами</h4>
-                    <div class="admin-form">
-                        <input type="text" id="promoCodeName" placeholder="Название промокода">
-                        <select id="promoRewardType">
-                            <option value="money">Монеты</option>
-                            <option value="clicks">Клики</option>
-                            <option value="vip">VIP статус</option>
-                            <option value="turbo">Турбо</option>
-                        </select>
-                        <input type="number" id="promoRewardValue" placeholder="Количество">
-                        <button class="btn-primary" id="adminAddPromo">➕ Создать промокод</button>
-                    </div>
-                    <div class="promo-list admin" id="adminPromoList"></div>
-                </div>
-
-                <div class="admin-section">
-                    <h4>События</h4>
-                    <div class="admin-form">
-                        <input type="text" id="eventName" placeholder="Название события">
-                        <select id="eventType">
-                            <option value="double">x2 доход</option>
-                            <option value="discount">Скидка 50%</option>
-                            <option value="free">Бесплатные кейсы</option>
-                        </select>
-                        <input type="datetime-local" id="eventEndTime">
-                        <button class="btn-primary" id="adminAddEvent">🎉 Создать событие</button>
-                    </div>
-                    <div class="events-list" id="adminEventsList"></div>
-                </div>
-
-                <div class="admin-section">
-                    <h4>Игроки</h4>
-                    <div class="players-search">
-                        <input type="text" id="playersSearch" placeholder="Поиск игрока...">
-                    </div>
-                    <div class="players-list" id="adminPlayersList"></div>
-                </div>
-            </div>
-
-            <!-- НАСТРОЙКИ -->
-            <div class="tab" id="settings">
-                <h3>⚙️ Настройки</h3>
-                <div class="settings-list">
-                    <label class="setting-item">
-                        <span>🔔 Уведомления</span>
-                        <input type="checkbox" id="notificationsCheck" checked>
-                    </label>
-                    <label class="setting-item">
-                        <span>📳 Вибрация</span>
-                        <input type="checkbox" id="vibrationCheck" checked>
-                    </label>
-                    <label class="setting-item">
-                        <span>🔊 Звуки</span>
-                        <input type="checkbox" id="soundsCheck" checked>
-                    </label>
-                    <label class="setting-item">
-                        <span>💾 Автосохранение</span>
-                        <input type="checkbox" id="autosaveCheck" checked>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <!-- МЕНЮ АВТОКЛИКЕРА -->
-        <div class="auto-menu" id="autoMenu">
-            <div class="auto-menu-header">
-                <span>🤖 Автокликер</span>
-                <button class="close-btn" id="closeAutoMenu">✕</button>
-            </div>
-            
-            <div class="auto-menu-content">
-                <div class="auto-stats">
-                    <div class="auto-stat">
-                        <span>Уровень</span>
-                        <span class="auto-value" id="autoMenuLevel">1</span>
-                    </div>
-                    <div class="auto-stat">
-                        <span>Куплено</span>
-                        <span class="auto-value" id="autoMenuCount">0</span>
-                    </div>
-                    <div class="auto-stat">
-                        <span>Доход</span>
-                        <span class="auto-value" id="autoMenuIncome">0/сек</span>
-                    </div>
-                </div>
-
-                <div class="auto-timer-block">
-                    <div class="timer-display" id="autoMenuTimer">2:00</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="autoMenuProgress"></div>
-                    </div>
-                </div>
-
-                <div class="turbo-block" id="turboSection">
-                    <div class="turbo-status">
-                        <span class="turbo-icon">⚡</span>
-                        <span id="turboStatus">Турбо режим выключен</span>
-                    </div>
-                    <div class="turbo-timer" id="turboTimer">0:00</div>
-                    <div class="progress-bar small">
-                        <div class="progress-fill" id="turboProgress"></div>
-                    </div>
-                </div>
-
-                <div class="auto-buttons">
-                    <button class="auto-btn primary" id="autoMenuStart">
-                        <span>▶️</span>
-                        <span>Запустить</span>
-                    </button>
-                    <button class="auto-btn" id="autoMenuUpgrade">
-                        <span>⬆️</span>
-                        <span>Улучшить</span>
-                        <span class="price" id="upgradePrice">100💰</span>
-                    </button>
-                    <button class="auto-btn turbo" id="autoMenuTurbo">
-                        <span>⚡</span>
-                        <span>Турбо</span>
-                        <span class="price">50💰</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ПЛАВАЮЩИЙ ПОДАРОК -->
-        <div class="gift" id="floatingGift">
-            <div class="gift-icon">🎁</div>
-            <div class="gift-timer" id="giftTimer">24:00</div>
-        </div>
-    </div>
-
-    <!-- АНИМАЦИЯ КЕЙСА -->
-    <div class="case-animation" id="caseAnimation">
-        <div class="case-content">
-            <div class="case-box" id="caseBox">📦</div>
-            <div class="case-text" id="caseText">Открываем...</div>
-            <div class="case-result" id="caseResult"></div>
-            <button class="case-close" id="closeCaseAnimation">✕</button>
-        </div>
-    </div>
-
-    <!-- УВЕДОМЛЕНИЯ -->
-    <div class="notifications" id="notifications"></div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="script.js"></script>
+  </div>
 </body>
 </html>
